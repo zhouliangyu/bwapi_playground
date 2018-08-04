@@ -1,5 +1,6 @@
 #include "ExampleAIModule.h"
 #include <iostream>
+#include <Greetings.h> // test if new files could be incorporated
 
 using namespace BWAPI;
 using namespace Filter;
@@ -8,6 +9,8 @@ void ExampleAIModule::onStart()
 {
   // Hello World!
   Broodwar->sendText("build from the command prompt!");
+  Greetings ggg("External Class!");
+  ggg.printGreeting();
 
   // Print the map name.
   // BWAPI returns std::string when retrieving a string, don't forget to add .c_str() when printing!
