@@ -1,5 +1,6 @@
 #include "ExampleAIModule.h"
 #include <iostream>
+#include <string>
 #include "Greetings.h" // test if new files could be incorporated
 
 using namespace BWAPI;

@@ -5,13 +5,13 @@
 using namespace BWAPI;
 using namespace Filter;
 
-class greeting
+class Greetings
 {
 private:
     std::string m_greetingWord;
 public:
-    greeting(std::string s) : m_greetingWorld {s}
+    greeting(const std::string& s) : m_greetingWorld {s}
     {
     }
-    void printGreeting() { Broodwar->sendText(m_greetingWord) }
-}
+    void printGreeting() { Broodwar->sendText(m_greetingWord); }
+};
