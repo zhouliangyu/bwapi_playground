@@ -7,10 +7,7 @@ using namespace Filter;
 
 void ExampleAIModule::onStart()
 {
-  // Hello World!
-  Broodwar->sendText("build from the command prompt!");
-
-  // Print the map name.
+  Broodwar->sendText("The first attempt to modified the code 180805"; // type text
   // BWAPI returns std::string when retrieving a string, don't forget to add .c_str() when printing!
   Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;
 
