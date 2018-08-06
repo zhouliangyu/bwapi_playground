@@ -36,6 +36,7 @@ void ExampleAIModule::onStart()
     // Retrieve you and your enemy's races. enemy() will just return the first enemy.
       Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
       buildQueue.push_back(UnitTypes::Zerg_Drone);
+      /* buildQueue.push_back(UnitTypes::Zerg_Overlord); */
   }
 }
 
@@ -57,7 +58,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
   Broodwar->drawTextScreen(20, 10, "Start Loc: (%d,%d)",
     Broodwar->self()->getStartLocation() );
   static unsigned int queueSize = buildQueue.size();
-  static unsigned int droneCount, baseCount;
+  static unsigned int totalUnitCount, droneCount, baseCount, overlordCount;
   Broodwar->drawTextScreen(120, 10, "Next item (queue size): %s(%d)",
     buildQueue[queueSize-1].c_str(), queueSize);
   // Return if the game is a replay or is paused
@@ -69,9 +70,9 @@ void ExampleAIModule::onFrame() // Called once every game frame
     return;
   
   // Iterate through all the units that we own
-  droneCount = 0; baseCount = 0;
-  Broodwar->drawTextScreen(20, 20, "droneCount(%d)baseCount(%d)", droneCount,
-    baseCount);
+  // initiate all count variables
+  totalUnitCount = 0;droneCount = 0; baseCount = 0; overlordCount = 0;
+
   for (auto &u : Broodwar->self()->getUnits())
   {
     // Ignore the unit if it no longer exists
@@ -85,8 +86,10 @@ void ExampleAIModule::onFrame() // Called once every game frame
       continue;
     // Finally make the unit do some stuff!
     // If the unit is a worker unit
+    if (!u->getType().isBuilding()) ++totalUnitCount;
     if (u->getType().isResourceDepot()) ++baseCount;
-        if ( u->getType().isWorker() )
+    if (u->getType() == UnitTypes::Zerg_Overlord) ++overlordCount;
+    if ( u->getType().isWorker() )
     {
       ++droneCount;
       if ( u->isIdle() ) // if our worker is idle
@@ -170,19 +173,56 @@ void ExampleAIModule::onFrame() // Called once every game frame
   // start to deal with the queue
   static auto currBuildItem = buildQueue.back();
   buildQueue.pop_back();
+  static Error lastErr;
+  static bool popedOutHandled = false;
   switch (currBuildItem)
   {
+    // TODO why never hit the switch inside? TODO
+    Broodwar->drawTextScreen(30, 30, "Inside switch!" );
     case UnitTypes::Zerg_Drone:
-      for (const auto &u : Broodwar->self()->getUnits())
+      for (const auto &u : Broodwar->self()->getUnits().getLarva())
       {
-        if (u->getType() == UnitTypes::Zerg_Larva)
-          { u->morph(UnitTypes::Zerg_Drone);break; }
+          u->morph(currBuildItem);
+          Error lastErr = Broodwar->getLastError();
+          break;
       }
-      if ((Broodwar->self()->getUnits().size() > 4*droneCount) || (12*baseCount > droneCount))
+      if (lastErr == Errors::Insufficient_Minerals)
+      {
+          buildQueue.push_back(UnitTypes::Zerg_Drone);
+          break;
+      }
+      if (lastErr == Errors::Insufficient_Supply)
+      {
+          buildQueue.push_back(UnitTypes::Zerg_Drone);
+          buildQueue.push_back(UnitTypes::Zerg_Overlord);
+          break;
+      }
+      if ((totalUnitCount > 4*droneCount) || (12*baseCount > droneCount))
         buildQueue.push_back(UnitTypes::Zerg_Drone);
+      if (totalUnitCount+4 >= 8*overlordCount)
+        buildQueue.push_back(UnitTypes::Zerg_Overlord);
+      popedOutHandled = true;
+      break;
+    case UnitTypes::Zerg_Overlord:
+      for (const auto &u : Broodwar->self()->getUnits().getLarva())
+      {
+          u->morph(currBuildItem);
+          Error lastErr = Broodwar->getLastError();
+          break;
+      }
+      if (lastErr == Errors::Insufficient_Minerals)
+      {
+          buildQueue.push_back(UnitTypes::Zerg_Overlord);
+          break;
+      }
+      popedOutHandled = true;
+      break;
+    default:
+      popedOutHandled = false;
       break;
   }
-}
+  if (!popedOutHandled) buildQueue.push_back(currBuildItem);
+} // end of onFrame
 
 void ExampleAIModule::onSendText(std::string text)
 {
