@@ -56,7 +56,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
   Broodwar->drawTextScreen(100, 10, "APM: %d", Broodwar->getAPM() );
   // andromeda: start locations: bottom right - (117, 119) top right - (117, 7) bottom -left (7, 118) top left (7,6)
   Broodwar->drawTextScreen(200, 10, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
-  Broodwar->drawTextScreen(100, 30, "Top item in queue: %s", buildQueue[buildQueue.size()]);
+  Broodwar->drawTextScreen(100, 30, "Top item in queue: %s", buildQueue.size());
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
     return;
