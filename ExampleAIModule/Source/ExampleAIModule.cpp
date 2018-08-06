@@ -35,7 +35,7 @@ void ExampleAIModule::onStart()
     // Retrieve you and your enemy's races. enemy() will just return the first enemy.
       Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
       static std::vector<UnitType> buildQueue; // define buildQueue
-      buildQueue.pash_back(Zerg_Drone);
+      buildQueue.pash_back(UnitTypesX::Zerg_Drone);
   }
 }
 
