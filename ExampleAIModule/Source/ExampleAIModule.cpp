@@ -1,6 +1,6 @@
 #include "ExampleAIModule.h"
 #include <iostream>
-#include <string>
+#include <vector> // use to build a building/training order
 
 using namespace BWAPI;
 using namespace Filter;
@@ -29,6 +29,7 @@ void ExampleAIModule::onStart()
   {
     // Retrieve you and your enemy's races. enemy() will just return the first enemy.
       Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
+      static std::vector buildQueue<UnitType>; // define buildQueue
   }
 }
 
