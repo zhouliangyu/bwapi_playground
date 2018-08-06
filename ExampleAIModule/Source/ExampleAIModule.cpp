@@ -46,6 +46,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
 {
   Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
   Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
+  Broodwar->drawTextScreen(200, 20, "APM: %d", Broodwar->getAPM() );
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
     return;
@@ -85,11 +86,9 @@ void ExampleAIModule::onFrame() // Called once every game frame
           }
         } // closure: has no powerup
       } // closure: if idle
-
     }
     else if ( u->getType().isResourceDepot() ) // A resource depot is a Command Center, Nexus, or Hatchery
     {
-
       // Order the depot to construct more workers! But only when it is idle.
       if ( u->isIdle() && !u->train(u->getType().getRace().getWorker()) )
       {
@@ -101,18 +100,15 @@ void ExampleAIModule::onFrame() // Called once every game frame
         Broodwar->registerEvent([pos,lastErr](Game*){ Broodwar->drawTextMap(pos, "%c%s", Text::White, lastErr.c_str()); },   // action
                                 nullptr,    // condition
                                 Broodwar->getLatencyFrames());  // frames to run
-
         // Retrieve the supply provider type in the case that we have run out of supplies
         UnitType supplyProviderType = u->getType().getRace().getSupplyProvider();
         static int lastChecked = 0;
-
         // If we are supply blocked and haven't tried constructing more recently
         if (  lastErr == Errors::Insufficient_Supply &&
               lastChecked + 400 < Broodwar->getFrameCount() &&
               Broodwar->self()->incompleteUnitCount(supplyProviderType) == 0 )
         {
           lastChecked = Broodwar->getFrameCount();
-
           // Retrieve a unit that is capable of constructing the supply needed
           Unit supplyBuilder = u->getClosestUnit(  GetType == supplyProviderType.whatBuilds().first &&
                                                     (IsIdle || IsGatheringMinerals) &&
@@ -134,7 +130,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
                                         },
                                         nullptr,  // condition
                                         supplyProviderType.buildTime() + 100 );  // frames to run
-
                 // Order the builder to construct the supply structure
                 supplyBuilder->build( supplyProviderType, targetBuildLocation );
               }
@@ -147,7 +142,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
           } // closure: supplyBuilder is valid
         } // closure: insufficient supply
       } // closure: failed to train idle unit
-
     }
 
   } // closure: unit iterator
@@ -155,14 +149,10 @@ void ExampleAIModule::onFrame() // Called once every game frame
 
 void ExampleAIModule::onSendText(std::string text)
 {
-
   // Send the text to the game if it is not being processed.
   Broodwar->sendText("%s", text.c_str());
-
-
   // Make sure to use %s and pass the text as a parameter,
   // otherwise you may run into problems when you use the %(percent) character!
-
 }
 
 void ExampleAIModule::onReceiveText(BWAPI::Player player, std::string text)
@@ -180,7 +170,6 @@ void ExampleAIModule::onPlayerLeft(BWAPI::Player player)
 
 void ExampleAIModule::onNukeDetect(BWAPI::Position target)
 {
-
   // Check if the target is a valid position
   if ( target )
   {
@@ -192,11 +181,10 @@ void ExampleAIModule::onNukeDetect(BWAPI::Position target)
     // Otherwise, ask other players where the nuke is!
     Broodwar->sendText("Where's the nuke?");
   }
-
   // You can also retrieve all the nuclear missile targets using Broodwar->getNukeDots()!
 }
 
-void ExampleAIModule::onUnitDiscover(BWAPI::Unit unit)
+void ExampleAIModule::onUnitDiscover(BWAPI::Unit unit) // if is enemy, attack?
 {
 }
 
