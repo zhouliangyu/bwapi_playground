@@ -11,7 +11,7 @@ void ExampleAIModule::onStart()
   if (Broodwar->self()->getRace() != Races::Zerg)
   {
     Broodwar->sendText("I can only play Zerg.");
-    Broodwar->restartGame();
+    Broodwar->restartGame(); // use leaveGame() is another option.
   }
   Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;   // BWAPI returns std::string when retrieving a string, don't forget to add .c_str() when printing!
   Broodwar->enableFlag(Flag::UserInput);                                  // Enable user control
@@ -35,6 +35,7 @@ void ExampleAIModule::onStart()
     // Retrieve you and your enemy's races. enemy() will just return the first enemy.
       Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
       static std::vector<UnitType> buildQueue; // define buildQueue
+      buildQueue.pash_back(Zerg_Drone);
   }
 }
 
@@ -50,11 +51,11 @@ void ExampleAIModule::onEnd(bool isWinner)
 
 void ExampleAIModule::onFrame() // Called once every game frame
 {
-  Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
-  Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
-  Broodwar->drawTextScreen(200, 20, "APM: %d", Broodwar->getAPM() );
+  Broodwar->drawTextScreen(100, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
+  Broodwar->drawTextScreen(200, 0, "Average FPS: %f", Broodwar->getAverageFPS() );
+  Broodwar->drawTextScreen(200, 10, "APM: %d", Broodwar->getAPM() );
   // andromeda: start locations: bottom right - (117, 119) top right - (117, 7)
-  Broodwar->drawTextScreen(200, 30, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
+  Broodwar->drawTextScreen(200, 20, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
     return;
