@@ -95,7 +95,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ExampleAIModule.h" />
-    <ClInclude Include="Source\Greetings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
