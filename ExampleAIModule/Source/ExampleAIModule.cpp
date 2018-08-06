@@ -8,6 +8,11 @@ using namespace Filter;
 void ExampleAIModule::onStart()
 {
   Broodwar->sendText("The first attempt to modified the code 180805");     // type text
+  if (Broodwar->self()->getRace() != Races::Zerg)
+  {
+    Broodwar->sendText("I can only play Zerg.");
+    Broodwar->restartGame();
+  }
   Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;   // BWAPI returns std::string when retrieving a string, don't forget to add .c_str() when printing!
   Broodwar->enableFlag(Flag::UserInput);                                  // Enable user control
   // Uncomment the following line and the bot will know about everything through the fog of war (cheat).
@@ -48,7 +53,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
   Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
   Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
   Broodwar->drawTextScreen(200, 20, "APM: %d", Broodwar->getAPM() );
-  // start locations: bottom right - (117, 119)
+  // andromeda: start locations: bottom right - (117, 119) top right - (117, 7)
   Broodwar->drawTextScreen(200, 30, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
