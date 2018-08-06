@@ -53,9 +53,10 @@ void ExampleAIModule::onFrame() // Called once every game frame
 {
   Broodwar->drawTextScreen(100, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
   Broodwar->drawTextScreen(200, 0, "Average FPS: %f", Broodwar->getAverageFPS() );
-  Broodwar->drawTextScreen(200, 10, "APM: %d", Broodwar->getAPM() );
-  // andromeda: start locations: bottom right - (117, 119) top right - (117, 7)
-  Broodwar->drawTextScreen(200, 20, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
+  Broodwar->drawTextScreen(100, 10, "APM: %d", Broodwar->getAPM() );
+  // andromeda: start locations: bottom right - (117, 119) top right - (117, 7) bottom -left (7, 118) top left (7,6)
+  Broodwar->drawTextScreen(200, 10, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
+  Broodwar->drawTextScreen(100, 30, "Top iterm in queue: %s", buildQueue[buildQueue.size()]);
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
     return;
