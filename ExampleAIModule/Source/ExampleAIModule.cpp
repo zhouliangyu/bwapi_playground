@@ -38,7 +38,7 @@ void ExampleAIModule::onEnd(bool isWinner)
   if ( isWinner )
   {
     // Log your win here!
-    Broodwar->sendText("I win!")
+    Broodwar->sendText("I win!");
   }
 }
 
