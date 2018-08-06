@@ -4,7 +4,7 @@
 
 using namespace BWAPI;
 using namespace Filter;
-static std::vector<UnitTypes> buildQueue; // define buildQueue
+static std::vector<UnitType> buildQueue; // define buildQueue
 
 void ExampleAIModule::onStart()
 {
@@ -39,8 +39,7 @@ void ExampleAIModule::onStart()
   }
 }
 
-void ExampleAIModule::onEnd(bool isWinner)
-  // Called when the game ends
+void ExampleAIModule::onEnd(bool isWinner) // Called when the game ends
 {
   if ( isWinner )
   {
@@ -51,12 +50,16 @@ void ExampleAIModule::onEnd(bool isWinner)
 
 void ExampleAIModule::onFrame() // Called once every game frame
 {
-  Broodwar->drawTextScreen(100, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
-  Broodwar->drawTextScreen(200, 0, "Average FPS: %f", Broodwar->getAverageFPS() );
-  Broodwar->drawTextScreen(100, 10, "APM: %d", Broodwar->getAPM() );
+  Broodwar->drawTextScreen(20, 0,  "FPS: %d", Broodwar->getFPS() ); // Display the game frame rate as text in the upper left area of the screen
+  Broodwar->drawTextScreen(120, 0, "Average FPS: %.2f", Broodwar->getAverageFPS());
+  Broodwar->drawTextScreen(270, 0, "APM: %d", Broodwar->getAPM() );
   // andromeda: start locations: bottom right - (117, 119) top right - (117, 7) bottom -left (7, 118) top left (7,6)
-  Broodwar->drawTextScreen(200, 10, "Start Loc: (%d,%d)", Broodwar->self()->getStartLocation() );
-  Broodwar->drawTextScreen(100, 0, "Top item in queue: %s", buildQueue[buildQueue.size()].c_str());
+  Broodwar->drawTextScreen(20, 10, "Start Loc: (%d,%d)",
+    Broodwar->self()->getStartLocation() );
+  static unsigned int queueSize = buildQueue.size();
+  static unsigned int droneCount, baseCount;
+  Broodwar->drawTextScreen(120, 10, "Next item (queue size): %s(%d)",
+    buildQueue[queueSize-1].c_str(), queueSize);
   // Return if the game is a replay or is paused
   if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
     return;
@@ -64,7 +67,11 @@ void ExampleAIModule::onFrame() // Called once every game frame
   // Latency frames are the number of frames before commands are processed.
   if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
     return;
+  
   // Iterate through all the units that we own
+  droneCount = 0; baseCount = 0;
+  Broodwar->drawTextScreen(20, 20, "droneCount(%d)baseCount(%d)", droneCount,
+    baseCount);
   for (auto &u : Broodwar->self()->getUnits())
   {
     // Ignore the unit if it no longer exists
@@ -78,8 +85,10 @@ void ExampleAIModule::onFrame() // Called once every game frame
       continue;
     // Finally make the unit do some stuff!
     // If the unit is a worker unit
-    if ( u->getType().isWorker() )
+    if (u->getType().isResourceDepot()) ++baseCount;
+        if ( u->getType().isWorker() )
     {
+      ++droneCount;
       if ( u->isIdle() ) // if our worker is idle
       {
         // Order workers carrying a resource to return them to the center,
@@ -97,6 +106,8 @@ void ExampleAIModule::onFrame() // Called once every game frame
         } // closure: has no powerup
       } // closure: if idle
     }
+
+    /*
     else if ( u->getType().isResourceDepot() ) // A resource depot is a Command Center, Nexus, or Hatchery
     {
       // Order the depot to construct more workers! But only when it is idle.
@@ -153,8 +164,24 @@ void ExampleAIModule::onFrame() // Called once every game frame
         } // closure: insufficient supply
       } // closure: failed to train idle unit
     }
-
+    */
   } // closure: unit iterator
+
+  // start to deal with the queue
+  static auto currBuildItem = buildQueue.back();
+  buildQueue.pop_back();
+  switch (currBuildItem)
+  {
+    case UnitTypes::Zerg_Drone:
+      for (const auto &u : Broodwar->self()->getUnits())
+      {
+        if (u->getType() == UnitTypes::Zerg_Larva)
+          { u->morph(UnitTypes::Zerg_Drone);break; }
+      }
+      if ((Broodwar->self()->getUnits().size() > 4*droneCount) || (12*baseCount > droneCount))
+        buildQueue.push_back(UnitTypes::Zerg_Drone);
+      break;
+  }
 }
 
 void ExampleAIModule::onSendText(std::string text)
