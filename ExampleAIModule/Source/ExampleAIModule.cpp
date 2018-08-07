@@ -70,7 +70,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
     // TODO
     // write a queue class that has member function of update, to update current
     // queue information on screen when queue is popped or pushed;
-    // (can buildings put into the queue?)
     // use frame to control making unit - when made a unit like overload. e.g.
     // use a variable to record when an overload has been made and if is still
     // within the interval, do not make another one. this check should come to
