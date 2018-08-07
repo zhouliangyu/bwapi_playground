@@ -57,8 +57,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
     // andromeda: start locations: bottom right - (117, 119) top right - (117, 7) bottom -left (7, 118) top left (7,6)
     Broodwar->drawTextScreen(20, 10, "Start Loc: (%d,%d)",
         Broodwar->self()->getStartLocation() );
-    static unsigned int queueSize = buildQueue.size();
-    static unsigned int totalUnitCount, droneCount, baseCount, overlordCount;
     Broodwar->drawTextScreen(120, 10, "Next item (queue size): %s(%d)",
         buildQueue[queueSize-1].c_str(), queueSize);
     // Return if the game is a replay or is paused
@@ -70,8 +68,9 @@ void ExampleAIModule::onFrame() // Called once every game frame
         return;
     // Iterate through all the units that we own
     // initiate all count variables
+    static unsigned int queueSize = buildQueue.size();
+    static unsigned int totalUnitCount, droneCount, baseCount, overlordCount;
     totalUnitCount = 0;droneCount = 0; baseCount = 0; overlordCount = 0;
-
     for (auto &u : Broodwar->self()->getUnits())
     {
         // Ignore the unit if it no longer exists
@@ -108,7 +107,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
                 } // closure: has no powerup
             } // closure: if idle
         }
-
         /*
         else if ( u->getType().isResourceDepot() ) // A resource depot is a Command Center, Nexus, or Hatchery
         {
@@ -173,54 +171,62 @@ void ExampleAIModule::onFrame() // Called once every game frame
     static auto currBuildItem = buildQueue.back();
     buildQueue.pop_back();
     static Error lastErr;
-    static bool popedOutHandled = false;
+    static bool buildItemHandled = false;
     switch (currBuildItem)
     {
-      // TODO why never hit the switch inside? TODO
-        Broodwar->drawTextScreen(30, 30, "Inside switch!" );
+      // TODO let it make Overlords! TODO
         case UnitTypes::Zerg_Drone:
             for (const auto &u : Broodwar->self()->getUnits().getLarva())
             {
-                u->morph(currBuildItem);
-                Error lastErr = Broodwar->getLastError();
-                break;
+                if (!u->morph(currBuildItem))
+                {
+                    Error lastErr = Broodwar->getLastError();
+                    break;
+                } else buildItemHandled = true;
             }
-            if (lastErr == Errors::Insufficient_Minerals)
-            {
-                buildQueue.push_back(UnitTypes::Zerg_Drone);
-                break;
-            }
-            if (lastErr == Errors::Insufficient_Supply)
+            if ((lastErr == Errors::Insufficient_Supply || totalUnitCount+4 >= 8*overlordCount)
+                && !buildItemHandled)
             {
                 buildQueue.push_back(UnitTypes::Zerg_Drone);
                 buildQueue.push_back(UnitTypes::Zerg_Overlord);
+                buildItemHandled = true;
                 break;
             }
-            if ((totalUnitCount > 4*droneCount) || (12*baseCount > droneCount))
-              buildQueue.push_back(UnitTypes::Zerg_Drone);
-            if (totalUnitCount+4 >= 8*overlordCount)
-              buildQueue.push_back(UnitTypes::Zerg_Overlord);
-            popedOutHandled = true;
+            if (lastErr == Errors::Insufficient_Minerals && !buildItemHandled)
+            {
+                buildQueue.push_back(UnitTypes::Zerg_Drone);
+                buildItemHandled = true;
+                break;
+            }
+            if (((totalUnitCount > 4*droneCount) || (12*baseCount > droneCount))
+                && buildItemHandled)
+            {
+                buildQueue.push_back(UnitTypes::Zerg_Drone);
+            }
             break;
         case UnitTypes::Zerg_Overlord:
             for (const auto &u : Broodwar->self()->getUnits().getLarva())
             {
-                u->morph(currBuildItem);
-                Error lastErr = Broodwar->getLastError();
-                break;
+                if (!u->morph(currBuildItem))
+                {
+                    Error lastErr = Broodwar->getLastError();
+                    break;
+                } else buildItemHandled = true;
             }
             if (lastErr == Errors::Insufficient_Minerals)
             {
                 buildQueue.push_back(UnitTypes::Zerg_Overlord);
-                break;
+                buildItemHandled = true;
             }
-            popedOutHandled = true;
             break;
         default:
-          popedOutHandled = false;
-          break;
+          buildItemHandled = false;
+    } // end of switch loop
+    if (!buildItemHandled)
+    {
+        buildQueue.push_back(currBuildItem);
+        buildItemHandled = true;
     }
-    if (!popedOutHandled) buildQueue.push_back(currBuildItem);
 } // end of onFrame
 
 void ExampleAIModule::onSendText(std::string text)
