@@ -16,7 +16,8 @@ class BuildQueue
     private:
         std::vector<BuildItemPair> m_queue;
     public:
-        bool push(const BuildItemPair& p, int f, bool updateOnScreen=true, int x=120, int y=10);
+        BuildQueue(); // constructor
+        bool push(const UnitType& t, int f, bool updateOnScreen=true, int x=120, int y=10);
         BuildItemPair pop(bool updateOnScreen=true, int x=120, int y=10);
         int size();
 };
