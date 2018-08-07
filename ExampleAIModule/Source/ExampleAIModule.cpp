@@ -8,7 +8,7 @@ static std::vector<UnitType> buildQueue; // define buildQueue
 
 void ExampleAIModule::onStart()
 {
-    Broodwar->sendText("The first attempt to modified the code 180805");     // type text
+    Broodwar->sendText("180806 from asus laptop");     // type text
     if (Broodwar->self()->getRace() != Races::Zerg)
     {
         Broodwar->sendText("I can only play Zerg.");
