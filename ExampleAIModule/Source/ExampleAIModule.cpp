@@ -194,7 +194,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
         buildQueue.pop_back();
         switch (currBuildItem)
         {
-          // TODO let it make Overlords! TODO
             case UnitTypes::Zerg_Drone:
                 for (const auto &u : Broodwar->self()->getUnits().getLarva())
                 {
@@ -204,7 +203,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
                         break;
                     }
                 }
-                if (lastErr == Errors::Insufficient_Supply || totalUnitCount+1 >= 8*overlordCount)
+                if (lastErr == Errors::Insufficient_Supply || totalUnitCount+2 >= 8*overlordCount)
                 {
                     buildQueue.push_back(UnitTypes::Zerg_Drone);
                     buildQueue.push_back(UnitTypes::Zerg_Overlord);
