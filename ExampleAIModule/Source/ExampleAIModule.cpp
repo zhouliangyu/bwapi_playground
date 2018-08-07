@@ -1,10 +1,22 @@
 #include "ExampleAIModule.h"
 #include <iostream>
 #include <vector> // use to build a building/training order
+#include <atlstr.h>
 
 using namespace BWAPI;
 using namespace Filter;
 static std::vector<UnitType> buildQueue; // define buildQueue
+
+void logMsg(const std::string& s)
+{
+    Broodwar->drawTextScreen(20, 50, s.c_str());
+}
+void logMsg(const unsigned int i)
+{
+    CString tempS;
+    tempS.Format(_T("%d"),i);
+    Broodwar->drawTextScreen(20, 50, tempS);
+}
 
 void ExampleAIModule::onStart()
 {
@@ -57,6 +69,10 @@ void ExampleAIModule::onFrame() // Called once every game frame
     // andromeda: start locations: bottom right - (117, 119) top right - (117, 7) bottom -left (7, 118) top left (7,6)
     Broodwar->drawTextScreen(20, 10, "Start Loc: (%d,%d)",
         Broodwar->self()->getStartLocation() );
+    // initiate all count variables
+    static unsigned int queueSize = buildQueue.size();
+    static unsigned int totalUnitCount, droneCount, baseCount, overlordCount;
+    totalUnitCount = 0; droneCount = 0; baseCount = 0; overlordCount = 0;
     Broodwar->drawTextScreen(120, 10, "Next item (queue size): %s(%d)",
         buildQueue[queueSize-1].c_str(), queueSize);
     // Return if the game is a replay or is paused
@@ -67,10 +83,6 @@ void ExampleAIModule::onFrame() // Called once every game frame
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
     // Iterate through all the units that we own
-    // initiate all count variables
-    static unsigned int queueSize = buildQueue.size();
-    static unsigned int totalUnitCount, droneCount, baseCount, overlordCount;
-    totalUnitCount = 0;droneCount = 0; baseCount = 0; overlordCount = 0;
     for (auto &u : Broodwar->self()->getUnits())
     {
         // Ignore the unit if it no longer exists
@@ -168,7 +180,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
     }   // closure: unit iterator
 
   // start to deal with the queue
-    static auto currBuildItem = buildQueue.back();
+    static UnitType currBuildItem = buildQueue.back();
     buildQueue.pop_back();
     static Error lastErr;
     static bool buildItemHandled = false;
@@ -182,7 +194,7 @@ void ExampleAIModule::onFrame() // Called once every game frame
                 {
                     Error lastErr = Broodwar->getLastError();
                     break;
-                } else buildItemHandled = true;
+                } else { buildItemHandled = true; }
             }
             if ((lastErr == Errors::Insufficient_Supply || totalUnitCount+4 >= 8*overlordCount)
                 && !buildItemHandled)
