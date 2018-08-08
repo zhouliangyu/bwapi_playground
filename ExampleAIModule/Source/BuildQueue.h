@@ -17,7 +17,8 @@ class BuildQueue
         std::vector<BuildItemPair> m_queue;
     public:
         BuildQueue(); // constructor
-        bool push(const UnitType& t, int f, bool updateOnScreen=true, int x=120, int y=10);
+        void logCurrQueueInfo(int x=120, int y=10);
+        bool push(const UnitType& t, int f=Broodwar->getFrameCount(), bool updateOnScreen=true, int x=120, int y=10);
         BuildItemPair pop(bool updateOnScreen=true, int x=120, int y=10);
-        int size();
+        int getQueueSize();
 };
