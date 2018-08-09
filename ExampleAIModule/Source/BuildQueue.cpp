@@ -7,13 +7,13 @@ using namespace Filter;
 void BuildQueue::updateOnScreen(int screenX, int screenY)
 {
     unsigned int queueSize = m_itemPairQueue.size();
-    Broodwar->registerEvent([&](Game*){ Broodwar->drawTextScreen(screenX, screenY,
-        "Next:%s Queue:%d", m_itemPairQueue[queueSize-1], queueSize); },   // action
-         nullptr,    // condition
-         Broodwar->getLatencyFrames());  // frames to run
+    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(screenX, screenY, "Next:%s Queue:%d", m_itemPairQueue[queueSize-1].m_buildItem.c_str(), queueSize); },   // action
+    nullptr,    // condition
+    Broodwar->getLatencyFrames());  // frames to run
+
 }
 
-void BuildQueue::push(const UnitType& t, unsigned int currFrame)
+void BuildQueue::push(const UnitType &t, unsigned int currFrame)
 {
     BuildItemPair p {t, currFrame};
     m_itemPairQueue.push_back(p);

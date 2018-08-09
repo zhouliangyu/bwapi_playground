@@ -28,6 +28,7 @@ void ExampleAIModule::onStart()
   {
     if ( Broodwar->enemy() )
       Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
+    buildQueue.push(UnitTypes::Zerg_Drone);
   }
 }
 
@@ -40,7 +41,6 @@ void ExampleAIModule::onEnd(bool isWinner)
 
 void ExampleAIModule::onFrame()
 {
-  buildQueue.push(UnitTypes::Zerg_Drone);
   Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
   Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
 
