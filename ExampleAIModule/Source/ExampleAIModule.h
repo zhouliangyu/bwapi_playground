@@ -1,6 +1,5 @@
 #pragma once
 #include <BWAPI.h>
-#include "BuildQueue.h"
 
 // Remember not to use "Broodwar" in any global class constructor!
 
