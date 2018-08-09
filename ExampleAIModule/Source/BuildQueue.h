@@ -19,5 +19,6 @@ class BuildQueue
         void push(const UnitType& t, unsigned int currFrame=Broodwar->getFrameCount());
         void push(const BuildItemPair& p);
         BuildItemPair pop();
+        unsigned int getQueueSize();
 };
 

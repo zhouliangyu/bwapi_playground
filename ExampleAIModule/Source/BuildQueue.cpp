@@ -33,3 +33,8 @@ BuildItemPair BuildQueue::pop()
     updateOnScreen();
     return p;
 }
+
+unsigned int BuildQueue::getQueueSize()
+{
+    return m_itemPairQueue.size();
+}
