@@ -1,89 +1,80 @@
 #include "ExampleAIModule.h"
-#include "BuildQueue.h"
 #include <iostream>
+#include "TaskQueue.h"
 
 using namespace BWAPI;
 using namespace Filter;
 
-BuildQueue buildQueue;
+TaskQueue taskQueue;
 
 void ExampleAIModule::onStart()
 {
-  if (Broodwar->self()->getRace() != Races::Zerg) Broodwar->restartGame();
-  Broodwar->sendText("Hello world!");
-  Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;
-  Broodwar->enableFlag(Flag::UserInput);
-  Broodwar->setCommandOptimizationLevel(2);
-  if ( Broodwar->isReplay() )
-  {
-    Broodwar << "The following players are in this replay:" << std::endl;
-    Playerset players = Broodwar->getPlayers();
-    for(auto p : players)
+    if (Broodwar->self()->getRace() != Races::Zerg) Broodwar->restartGame();
+    Broodwar->enableFlag(Flag::UserInput);
+    Broodwar->setCommandOptimizationLevel(2);
+    if ( Broodwar->isReplay() )
     {
-      if ( !p->isObserver() )
-        Broodwar << p->getName() << ", playing as " << p->getRace() << std::endl;
+        Broodwar << "The following players are in this replay:" << std::endl;
+        Playerset players = Broodwar->getPlayers();
+        for(auto p : players)
+        {
+            if ( !p->isObserver() )
+                Broodwar << p->getName() << ", playing as " << p->getRace() << std::endl;
+        }
     }
-  }
-  else
-  {
-    if ( Broodwar->enemy() )
-      Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
-  }
+    else
+    {
+        if ( Broodwar->enemy() )
+            Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
+        taskQueue.push(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone); // onStart, push a worker
+    }
 }
 
 void ExampleAIModule::onEnd(bool isWinner)
 {
-  if ( isWinner )
-  {
-  }
+    if ( isWinner )
+    {
+    }
 }
 
 void ExampleAIModule::onFrame()
 {
-  Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
-  Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
-  if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
-    return;
-  if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
-    return;
-  if (buildQueue.getQueueSize() < 1 && Broodwar->getFrameCount() < 24)
-    buildQueue.push(UnitTypes::Zerg_Drone); // push the first item here
-  // initate some counting numbers
-  unsigned int workerNum = 0;
-  unsigned int resourceDepotNum = 0;
-  for (auto &u : Broodwar->self()->getUnits())
-  {
-    // Make sure to include this block when handling any Unit pointer!
-    if ( !u->exists() )
-      continue;
-    if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
-      continue;
-    if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
-      continue;
-    if ( !u->isCompleted() || u->isConstructing() )
-      continue;
-
-    // If the unit is a worker unit
-    if ( u->getType().isWorker() )
+    Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
+    Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
+    if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
+        return;
+    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
+        return;
+    for (auto &u : Broodwar->self()->getUnits())
     {
-      ++workerNum;
-      if ( u->isIdle() )
-      {
-        if ( u->isCarryingGas() || u->isCarryingMinerals() )
+        // Make sure to include this block when handling any Unit pointer!
+        if ( !u->exists() )
+            continue;
+        if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
+            continue;
+        if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
+            continue;
+        if ( !u->isCompleted() || u->isConstructing() )
+            continue;
+        taskQueue.updateOnScreen(); // confirm the first worker has been pushed in
+        // If the unit is a worker unit
+        if ( u->getType().isWorker() )
         {
-          u->returnCargo();
+            if ( u->isIdle() )
+            {
+                if ( u->isCarryingGas() || u->isCarryingMinerals() )
+                {
+                    u->returnCargo();
+                }
+                else if ( !u->getPowerUp() )
+                {
+                    if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
+                    {
+                        Broodwar << Broodwar->getLastError() << std::endl;
+                    }
+                }
+            }
         }
-        else if ( !u->getPowerUp() )
-        {
-          if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
-          {
-            Broodwar << Broodwar->getLastError() << std::endl;
-          }
-        }
-      }
-    }
-    if (u->getType().isResourceDepot()) ++resourceDepotNum;
-
 
     /* else if ( u->getType().isResourceDepot() ) */
     /* { */
@@ -132,52 +123,6 @@ void ExampleAIModule::onFrame()
     /*   } */
     /* } */
   } // end of unit loop
-  
-  if (buildQueue.getQueueSize() > 0)
-  {
-    BuildItemPair currItem = buildQueue.pop();
-    Error lastErr = Errors::None;
-    unsigned int popFrame = Broodwar->getFrameCount();
-    switch (currItem.m_buildItem)
-    {
-        case UnitTypes::Zerg_Drone:
-            for (const auto& l : Broodwar->self()->getUnits().getLarva())
-            {
-                if (!l->morph(UnitTypes::Zerg_Drone))
-                    lastErr = Broodwar->getLastError();
-                break; // break the for loop
-            }
-            if (lastErr == Errors::Insufficient_Minerals)
-            {
-                buildQueue.push(currItem);
-                break;
-            }
-            else if (lastErr == Errors::Insufficient_Supply)
-            {
-                buildQueue.push(currItem);
-                buildQueue.push(UnitTypes::Zerg_Overlord);
-                break;
-            }
-            if ((Broodwar->self()->getUnits().size() > 3*workerNum || 15*resourceDepotNum > workerNum))
-                buildQueue.push(UnitTypes::Zerg_Drone);
-            break;
-        case UnitTypes::Zerg_Overlord:
-            if (Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Overlord) > 0)
-                break;
-            for (const auto& l : Broodwar->self()->getUnits().getLarva())
-            {
-                if (!l->morph(UnitTypes::Zerg_Overlord))
-                    lastErr = Broodwar->getLastError();
-                break; // break the for loop
-            }
-            if (lastErr == Errors::Insufficient_Minerals)
-            {
-                buildQueue.push(currItem);
-            }
-            break;
-    }
-  }
-
 
 
 
