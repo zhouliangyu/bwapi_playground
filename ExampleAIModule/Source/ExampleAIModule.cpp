@@ -45,6 +45,13 @@ void ExampleAIModule::onFrame()
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
+    
+    // on every frame, pop out a task
+    if (taskQueue.pop() > 0)
+    {
+        TaskItem currTask = taskQueue.pop();
+    }
+
     for (auto &u : Broodwar->self()->getUnits())
     {
         // Make sure to include this block when handling any Unit pointer!
@@ -56,7 +63,7 @@ void ExampleAIModule::onFrame()
             continue;
         if ( !u->isCompleted() || u->isConstructing() )
             continue;
-        taskQueue.updateOnScreen(); // confirm the first worker has been pushed in
+
         // If the unit is a worker unit
         if ( u->getType().isWorker() )
         {
