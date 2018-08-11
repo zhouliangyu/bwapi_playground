@@ -26,6 +26,13 @@ bool TaskQueue::push(const TaskCategories& c, const UnitType& t)
     return true;
 }
 
+bool TaskQueue::push(const TaskItem& t)
+{
+    m_taskQueue.push_back(t);
+    updateOnScreen();
+    return true;
+}
+
 TaskItem TaskQueue::pop()
 {
     if (getQueueSize() == 0)

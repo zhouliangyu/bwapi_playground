@@ -24,6 +24,7 @@ class TaskQueue
     public:
         int getQueueSize();
         bool updateOnScreen();
-        bool push(const TaskCategories& c, const UnitType& t); // simple function to build new unit
+        bool push(const TaskCategories& c, const UnitType& t);
+        bool push(const TaskItem& t);
         TaskItem pop();
 };
