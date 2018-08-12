@@ -10,10 +10,10 @@ TaskQueue taskQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
 const int AUTO_BUILD_RANGE = 1000;
-const int FIRST_SPAWNING = 5;
-int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
-bool isBuildingDeployed = false;
-const int MINERAL_BUFFER = 100;
+const int FIRST_SPAWNING = 7;
+int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 50;
+bool isBuildingDeployed = true;
+const int MINERAL_BUFFER = 0;
 
 void ExampleAIModule::onStart()
 {
@@ -53,9 +53,7 @@ void ExampleAIModule::onFrame()
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
-    if (Broodwar->getFrameCount() % Broodwar->getLatencyFrames()*500 == 0)
-        taskQueue.updateOnScreen();
-
+    taskQueue.updateOnScreen();
     // variable initiation
     TaskItem currTask;
     Error lastErr = Errors::None;
@@ -179,7 +177,7 @@ void ExampleAIModule::onFrame()
 
     // push new units
     if (!isBuildingDeployed || Broodwar->getFrameCount() - suspensionLastCheck < SUSPENSION_INTERVAL) return;
-    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) * 
+    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) *
         DRONE_BOUNDARY_FACTOR || (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Lair) +
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hive)) * DRONE_EVERY_BASE >

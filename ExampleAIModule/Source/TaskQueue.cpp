@@ -1,5 +1,6 @@
 #include <BWAPI.h>
 #include <string>
+#include <vector>
 #include "TaskQueue.h"
 
 using namespace BWAPI;
@@ -12,32 +13,28 @@ int TaskQueue::getQueueSize()
 
 bool TaskQueue::updateOnScreen()
 {
-    int queueSending = 3;
-    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
-        0, "Queue Size: %d", getQueueSize()); },   // action
-        nullptr,    // condition
-        Broodwar->getLatencyFrames());  // frames to run
-    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
-        10, "%s", "------ Stack ------"); },   // action
-        nullptr,    // condition
-        Broodwar->getLatencyFrames());  // frames to run
-    int printedCounter = 0;
-    for (int i = getQueueSize()-1; i>=0; i--)
+    if (getQueueSize() == 0)
     {
         Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
-            20+printedCounter*10, "%d:%s", i, m_taskQueue[i].getRelatedUnit().c_str() ); },   // action
+            0, "Stack is empty."); },   // action
             nullptr,    // condition
-        Broodwar->getLatencyFrames());  // frames to run
-        ++printedCounter;
-        if (printedCounter > queueSending) break;
+            Broodwar->getLatencyFrames());  // frames to run
+        return false;
     }
-    return true;
+    else
+    {
+        Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
+            0, "Stack [%d]:[%s]", getQueueSize(), m_taskQueue[getQueueSize()-1].getRelatedUnit().c_str()); },   // action
+            nullptr,    // condition
+            Broodwar->getLatencyFrames());  // frames to run
+        return true;
+    }
 }
 
 bool TaskQueue::push(const TaskItem& t)
 {
     m_taskQueue.push_back(t);
-    updateOnScreen();
+    /* updateOnScreen(); */
     return true;
 }
 
@@ -50,7 +47,7 @@ TaskItem TaskQueue::pop()
     }
     TaskItem poppedItem = m_taskQueue.back();
     m_taskQueue.pop_back();
-    updateOnScreen();
+    /* updateOnScreen(); */
     return poppedItem;
 }
 
