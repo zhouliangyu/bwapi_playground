@@ -16,4 +16,5 @@ class TaskQueue
         bool updateOnScreen();
         bool push(const TaskItem& t);
         TaskItem pop();
+        int searchTaskRelatedUnit(const UnitType& t );
 };

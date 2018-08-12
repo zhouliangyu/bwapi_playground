@@ -8,7 +8,12 @@ using namespace Filter;
 // initiation of system wide variables
 TaskQueue taskQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
-const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 15;
+const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
+const int AUTO_BUILD_RANGE = 1000;
+const int FIRST_SPAWNING = 5;
+int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
+bool isBuildingDeployed = false;
+const int MINERAL_BUFFER = 100;
 
 void ExampleAIModule::onStart()
 {
@@ -48,18 +53,19 @@ void ExampleAIModule::onFrame()
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
-    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames()*10 == 0 )
+    if (Broodwar->getFrameCount() % Broodwar->getLatencyFrames()*500 == 0)
         taskQueue.updateOnScreen();
 
-    
     // variable initiation
     TaskItem currTask;
-    Error lastTrainErr = Errors::None;
+    Error lastErr = Errors::None;
     // on every frame, pop out a task
     if (taskQueue.getQueueSize() > 0)
     {
         currTask = taskQueue.pop();
     }
+    if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
+        isBuildingDeployed = false;
 
     for (auto &u : Broodwar->self()->getUnits())
     {
@@ -72,18 +78,37 @@ void ExampleAIModule::onFrame()
             continue;
         if ( !u->isCompleted() || u->isConstructing() )
             continue;
-
-
         // If the unit is a worker unit
         if ( u->getType().isWorker() )
         {
+            if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
+            {
+                if (currTask.getMineralRequired() >= Broodwar->self()->minerals() + MINERAL_BUFFER)
+                {
+                    lastErr = Errors::Insufficient_Minerals;
+                }
+                else
+                {
+                    if (!isBuildingDeployed)
+                    {
+                        if (!u->build(currTask.getRelatedUnit(),
+                            Broodwar->getBuildLocation(currTask.getRelatedUnit(),
+                            u->getTilePosition(), AUTO_BUILD_RANGE)))
+                        {
+                            lastErr = Broodwar->getLastError();
+                        }
+                        isBuildingDeployed = true;
+                        suspensionLastCheck = Broodwar->getFrameCount();
+                    }
+                }
+            }
             if ( u->isIdle() )
             {
                 if ( u->isCarryingGas() || u->isCarryingMinerals() )
                 {
                     u->returnCargo();
                 }
-                else if ( !u->getPowerUp() )
+                if ( !u->getPowerUp() )
                 {
                     if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
                     {
@@ -104,7 +129,7 @@ void ExampleAIModule::onFrame()
                     {
                         if ( !l->morph(UnitTypes::Zerg_Drone) )
                         {
-                            lastTrainErr = Broodwar->getLastError();
+                            lastErr = Broodwar->getLastError();
                         }
                         break; // break the foor loop of larva
                     }
@@ -115,7 +140,7 @@ void ExampleAIModule::onFrame()
                     {
                         if ( !l->morph(UnitTypes::Zerg_Overlord) )
                         {
-                            lastTrainErr = Broodwar->getLastError();
+                            lastErr = Broodwar->getLastError();
                         }
                         overlordLastChecked = Broodwar->getFrameCount();
                         break; // break the foor loop of larva
@@ -127,14 +152,15 @@ void ExampleAIModule::onFrame()
     } // end of unit loop
     
     // Error handling
-    if ( lastTrainErr == Errors::Insufficient_Minerals )
+    if ( lastErr == Errors::Insufficient_Minerals )
     {
-        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT )
+        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT ||
+            currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
             taskQueue.push(currTask);
-        lastTrainErr = Errors::None;
+        lastErr = Errors::None;
         return;
     }
-    if ( lastTrainErr == Errors::Insufficient_Supply )
+    if ( lastErr == Errors::Insufficient_Supply )
     {
         if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT)
             taskQueue.push(currTask);
@@ -144,20 +170,34 @@ void ExampleAIModule::onFrame()
             taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord));
             overlordLastChecked = Broodwar->getFrameCount();
         }
-        lastTrainErr = Errors::None;
+        lastErr = Errors::None;
         return;
     }
+    if (lastErr == Errors::Insufficient_Gas)
+    {
+    }
 
-    // build new units
-    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) * DRONE_BOUNDARY_FACTOR ||
-        (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +
+    // push new units
+    if (!isBuildingDeployed || Broodwar->getFrameCount() - suspensionLastCheck < SUSPENSION_INTERVAL) return;
+    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) * 
+        DRONE_BOUNDARY_FACTOR || (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Lair) +
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hive)) * DRONE_EVERY_BASE >
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone)) &&
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Drone) == 0)
     {
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
+        Broodwar->sendText("%s", "pushed drone!");
     }
+    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) >= FIRST_SPAWNING &&
+        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
+        taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Spawning_Pool) == -1 &&
+        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
+    {
+        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Spawning_Pool));
+        Broodwar->sendText("%s", "pushed spawning!");
+    }
+
 
 
 } // end of "onFrame"

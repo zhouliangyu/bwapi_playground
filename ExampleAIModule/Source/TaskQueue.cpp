@@ -12,9 +12,25 @@ int TaskQueue::getQueueSize()
 
 bool TaskQueue::updateOnScreen()
 {
-    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0, 0, "Queue Size: %d", getQueueSize()); },   // action
+    int queueSending = 3;
+    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
+        0, "Queue Size: %d", getQueueSize()); },   // action
         nullptr,    // condition
         Broodwar->getLatencyFrames());  // frames to run
+    Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
+        10, "%s", "------ Stack ------"); },   // action
+        nullptr,    // condition
+        Broodwar->getLatencyFrames());  // frames to run
+    int printedCounter = 0;
+    for (int i = getQueueSize()-1; i>=0; i--)
+    {
+        Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
+            20+printedCounter*10, "%d:%s", i, m_taskQueue[i].getRelatedUnit().c_str() ); },   // action
+            nullptr,    // condition
+        Broodwar->getLatencyFrames());  // frames to run
+        ++printedCounter;
+        if (printedCounter > queueSending) break;
+    }
     return true;
 }
 
@@ -36,4 +52,16 @@ TaskItem TaskQueue::pop()
     m_taskQueue.pop_back();
     updateOnScreen();
     return poppedItem;
+}
+
+int TaskQueue::searchTaskRelatedUnit(const UnitType& t)
+{
+    int indexCounter = 0;
+    for (const auto& e : m_taskQueue)
+    {
+        if (e.getRelatedUnit() == t)
+            return indexCounter;
+        ++indexCounter;
+    }
+    return -1;
 }
