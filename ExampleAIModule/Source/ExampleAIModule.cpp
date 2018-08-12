@@ -6,12 +6,25 @@ using namespace BWAPI;
 using namespace Filter;
 
 // initiation of system wide variables
+const bool IS_DEVELOPING = true;
+const int LOG_MESSEGE_INTERVAL = 100; int messegeLastLogged = 0;
+void logMessegeOnScreen(const std::string& s, int i=0)
+{
+    if (!IS_DEVELOPING) return;
+    if (Broodwar->getFrameCount() - messegeLastLogged > LOG_MESSEGE_INTERVAL)
+    {
+        Broodwar->sendTextEx(true,"%s(%d)", s.c_str(), i);
+        messegeLastLogged = Broodwar->getFrameCount();
+    }
+}
+
+
 TaskQueue taskQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
 const int AUTO_BUILD_RANGE = 1000;
-const int FIRST_SPAWNING = 7;
-int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 50;
+const int FIRST_SPAWNING = 6;
+int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 const int MINERAL_BUFFER = 0;
 
@@ -35,6 +48,7 @@ void ExampleAIModule::onStart()
         if ( Broodwar->enemy() )
             Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone)); // onStart, push a worker
+        logMessegeOnScreen("On start of game pushed a drone");
     }
 }
 
@@ -119,7 +133,8 @@ void ExampleAIModule::onFrame()
         // if the unit is a Hatchery, Lair or Hive
         if ( u->getType().producesLarva() )
         {
-            if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT )
+            if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT &&
+                Broodwar->getFrameCount() - suspensionLastCheck > SUSPENSION_INTERVAL)
             {
                 if ( currTask.getRelatedUnit() == UnitTypes::Zerg_Drone )
                 {
@@ -166,6 +181,7 @@ void ExampleAIModule::onFrame()
             Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Overlord) == 0)
         {
             taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord));
+            logMessegeOnScreen("Pushed overlord because of the Insufficient_Supply error");
             overlordLastChecked = Broodwar->getFrameCount();
         }
         lastErr = Errors::None;
@@ -185,7 +201,7 @@ void ExampleAIModule::onFrame()
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Drone) == 0)
     {
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
-        Broodwar->sendText("%s", "pushed drone!");
+        logMessegeOnScreen("Pushed drone because drones are few");
     }
     if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) >= FIRST_SPAWNING &&
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
@@ -193,7 +209,7 @@ void ExampleAIModule::onFrame()
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
     {
         taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Spawning_Pool));
-        Broodwar->sendText("%s", "pushed spawning!");
+        logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
     }
 
 
@@ -205,7 +221,6 @@ void ExampleAIModule::onSendText(std::string text)
 
   // Send the text to the game if it is not being processed.
   Broodwar->sendText("%s", text.c_str());
-
 
   // Make sure to use %s and pass the text as a parameter,
   // otherwise you may run into problems when you use the %(percent) character!

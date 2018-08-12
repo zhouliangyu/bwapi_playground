@@ -34,7 +34,6 @@ bool TaskQueue::updateOnScreen()
 bool TaskQueue::push(const TaskItem& t)
 {
     m_taskQueue.push_back(t);
-    /* updateOnScreen(); */
     return true;
 }
 
@@ -47,7 +46,6 @@ TaskItem TaskQueue::pop()
     }
     TaskItem poppedItem = m_taskQueue.back();
     m_taskQueue.pop_back();
-    /* updateOnScreen(); */
     return poppedItem;
 }
 
