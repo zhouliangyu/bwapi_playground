@@ -18,14 +18,6 @@ bool TaskQueue::updateOnScreen()
     return true;
 }
 
-bool TaskQueue::push(const TaskCategories& c, const UnitType& t)
-{
-    TaskItem itemPushed { c, t };
-    m_taskQueue.push_back(itemPushed);
-    updateOnScreen();
-    return true;
-}
-
 bool TaskQueue::push(const TaskItem& t)
 {
     m_taskQueue.push_back(t);
@@ -37,7 +29,7 @@ TaskItem TaskQueue::pop()
 {
     if (getQueueSize() == 0)
     {
-        TaskItem blankItem {TaskCategories::NONE, UnitTypes::None};
+        TaskItem blankItem(TaskCategories::NONE, UnitTypes::None);
         return blankItem;
     }
     TaskItem poppedItem = m_taskQueue.back();

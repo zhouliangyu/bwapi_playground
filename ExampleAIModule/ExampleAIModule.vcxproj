@@ -92,10 +92,12 @@
   <ItemGroup>
     <ClCompile Include="Source\Dll.cpp" />
     <ClCompile Include="Source\ExampleAIModule.cpp" />
+    <ClCompile Include="Source\TaskItem.cpp" />
     <ClCompile Include="Source\TaskQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ExampleAIModule.h" />
+    <ClInclude Include="Source\TaskItem.h" />
     <ClInclude Include="Source\TaskQueue.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

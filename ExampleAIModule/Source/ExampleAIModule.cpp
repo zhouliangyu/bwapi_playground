@@ -7,7 +7,8 @@ using namespace Filter;
 
 // initiation of system wide variables
 TaskQueue taskQueue;
-int totalDroneCount = 0;
+int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
+const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 15;
 
 void ExampleAIModule::onStart()
 {
@@ -28,8 +29,7 @@ void ExampleAIModule::onStart()
     {
         if ( Broodwar->enemy() )
             Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
-        taskQueue.push(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone); // onStart, push a worker
-        ++totalDroneCount;
+        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone)); // onStart, push a worker
     }
 }
 
@@ -48,6 +48,9 @@ void ExampleAIModule::onFrame()
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
+    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames()*10 == 0 )
+        taskQueue.updateOnScreen();
+
     
     // variable initiation
     TaskItem currTask;
@@ -93,84 +96,68 @@ void ExampleAIModule::onFrame()
         // if the unit is a Hatchery, Lair or Hive
         if ( u->getType().producesLarva() )
         {
-            if ( currTask.m_taskCategory == TaskCategories::TRAIN_UNIT )
+            if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT )
             {
-                if ( currTask.m_relatedUnit == UnitTypes::Zerg_Drone )
+                if ( currTask.getRelatedUnit() == UnitTypes::Zerg_Drone )
                 {
                     for (const auto& l : u->getLarva() )
                     {
                         if ( !l->morph(UnitTypes::Zerg_Drone) )
                         {
                             lastTrainErr = Broodwar->getLastError();
-                            --totalDroneCount;
                         }
+                        break; // break the foor loop of larva
+                    }
+                }
+                else if ( currTask.getRelatedUnit() == UnitTypes::Zerg_Overlord )
+                {
+                    for (const auto& l : u->getLarva() )
+                    {
+                        if ( !l->morph(UnitTypes::Zerg_Overlord) )
+                        {
+                            lastTrainErr = Broodwar->getLastError();
+                        }
+                        overlordLastChecked = Broodwar->getFrameCount();
                         break; // break the foor loop of larva
                     }
                 }
             }
         }
 
-        /* else if ( u->getType().isResourceDepot() ) */
-        /* { */
-        /*   if ( u->isIdle() && !u->train(u->getType().getRace().getWorker()) ) */
-        /*   { */
-        /*     Position pos = u->getPosition(); */
-        /*     Error lastErr = Broodwar->getLastError(); */
-        /*     Broodwar->registerEvent([pos,lastErr](Game*){ Broodwar->drawTextMap(pos, "%c%s", Text::White, lastErr.c_str()); },   // action */
-        /*                             nullptr,    // condition */
-        /*                             Broodwar->getLatencyFrames());  // frames to run */
-        /*     UnitType supplyProviderType = u->getType().getRace().getSupplyProvider(); */
-        /*     static int lastChecked = 0; */
-        /*     if (  lastErr == Errors::Insufficient_Supply && */
-        /*           lastChecked + 400 < Broodwar->getFrameCount() && */
-        /*           Broodwar->self()->incompleteUnitCount(supplyProviderType) == 0 ) */
-        /*     { */
-        /*       lastChecked = Broodwar->getFrameCount(); */
-        /*       Unit supplyBuilder = u->getClosestUnit(  GetType == supplyProviderType.whatBuilds().first && */
-        /*                                                 (IsIdle || IsGatheringMinerals) && */
-        /*                                                 IsOwned); */
-        /*       if ( supplyBuilder ) */
-        /*       { */
-        /*         if ( supplyProviderType.isBuilding() ) */
-        /*         { */
-        /*           TilePosition targetBuildLocation = Broodwar->getBuildLocation(supplyProviderType, supplyBuilder->getTilePosition()); */
-        /*           if ( targetBuildLocation ) */
-        /*           { */
-        /*             Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*) */
-        /*                                     { */
-        /*                                       Broodwar->drawBoxMap( Position(targetBuildLocation), */
-        /*                                                             Position(targetBuildLocation + supplyProviderType.tileSize()), */
-        /*                                                             Colors::Blue); */
-        /*                                     }, */
-        /*                                     nullptr,  // condition */
-        /*                                     supplyProviderType.buildTime() + 100 );  // frames to run */
-        /*             supplyBuilder->build( supplyProviderType, targetBuildLocation ); */
-        /*           } */
-        /*         } */
-        /*         else */
-        /*         { */
-        /*           // Train the supply provider (Overlord) if the provider is not a structure */
-        /*           supplyBuilder->train( supplyProviderType ); */
-        /*         } */
-        /*       } */
-        /*     } */
-        /*   } */
-        /* } */
     } // end of unit loop
     
     // Error handling
-    if ( currTask.m_taskCategory == TaskCategories::TRAIN_UNIT )
+    if ( lastTrainErr == Errors::Insufficient_Minerals )
     {
-        if ( lastTrainErr == Errors::Insufficient_Supply )
-        {
+        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT )
             taskQueue.push(currTask);
-            taskQueue.push(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord);
-            lastTrainErr = Errors::None;
+        lastTrainErr = Errors::None;
+        return;
+    }
+    if ( lastTrainErr == Errors::Insufficient_Supply )
+    {
+        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT)
+            taskQueue.push(currTask);
+        if ( Broodwar->getFrameCount() - overlordLastChecked > OVERLORD_CHECK_INTERVAL &&
+            Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Overlord) == 0)
+        {
+            taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord));
+            overlordLastChecked = Broodwar->getFrameCount();
         }
+        lastTrainErr = Errors::None;
+        return;
     }
 
     // build new units
-    if ( Broodwar->self()->all ) //TODO
+    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) * DRONE_BOUNDARY_FACTOR ||
+        (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +
+        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Lair) +
+        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hive)) * DRONE_EVERY_BASE >
+        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone)) &&
+        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Drone) == 0)
+    {
+        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
+    }
 
 
 } // end of "onFrame"

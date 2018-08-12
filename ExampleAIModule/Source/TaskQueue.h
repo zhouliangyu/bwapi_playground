@@ -1,21 +1,11 @@
 #pragma once
 #include <BWAPI.h>
 #include <vector>
+#include "TaskItem.h"
 
 using namespace BWAPI;
 using namespace Filter;
 
-enum class TaskCategories
-{
-    TRAIN_UNIT,
-    NONE
-};
-
-struct TaskItem
-{
-    TaskCategories m_taskCategory;
-    UnitType m_relatedUnit;
-};
 
 class TaskQueue
 {
@@ -24,7 +14,6 @@ class TaskQueue
     public:
         int getQueueSize();
         bool updateOnScreen();
-        bool push(const TaskCategories& c, const UnitType& t);
         bool push(const TaskItem& t);
         TaskItem pop();
 };
