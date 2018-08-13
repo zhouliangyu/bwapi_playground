@@ -13,6 +13,9 @@ TaskItem::TaskItem(const TaskCategories& t, const UnitType& u) :
         case UnitTypes::Zerg_Spawning_Pool:
             m_mineralRequired = 200;
             break;
+        case UnitTypes::Zerg_Hatchery:
+            m_mineralRequired = 300;
+            break;
         default:
             m_mineralRequired = 0;
     }

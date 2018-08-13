@@ -23,13 +23,15 @@ void logMessegeOnScreen(const char* s, int i=0)
 TaskQueue taskQueue;
 PositionQueue positionQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
+int zerglingLastChecked = 0; const int ZERGLING_CHECK_INTERVAL = 470;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
 const int AUTO_BUILD_RANGE = 1000;
 const int FIRST_SPAWNING = 6;
 int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 const int MINERAL_BUFFER = 0;
-bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 500;
+bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 600;
+bool lackingLarva = false; int hatcheryLastPushed = 0; const int HATCHERY_CHECK_INTERVAL = 600;
 
 void ExampleAIModule::onStart()
 {
@@ -68,6 +70,7 @@ void ExampleAIModule::onFrame()
     Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
     Broodwar->drawTextScreen(250, 0,  "APM: %d", Broodwar->getAPM() );
     Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
+
     if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
@@ -81,7 +84,7 @@ void ExampleAIModule::onFrame()
     {
         currTask = taskQueue.pop();
     }
-    // asign scouter type
+    // assign scouter type
     if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
     {
         isScoutSent = false;
@@ -101,6 +104,7 @@ void ExampleAIModule::onFrame()
     if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
         isBuildingDeployed = false;
     // loop through all units
+    lackingLarva = true;
     for (auto &u : Broodwar->self()->getUnits())
     {
         // Make sure to include this block when handling any Unit pointer!
@@ -185,6 +189,7 @@ void ExampleAIModule::onFrame()
                         {
                             lastErr = Broodwar->getLastError();
                         }
+                        lackingLarva = false;
                         break; // break the foor loop of larva
                     }
                 }
@@ -196,7 +201,21 @@ void ExampleAIModule::onFrame()
                         {
                             lastErr = Broodwar->getLastError();
                         }
+                        lackingLarva = false;
                         overlordLastChecked = Broodwar->getFrameCount();
+                        break; // break the foor loop of larva
+                    }
+                }
+                else if ( currTask.getRelatedUnit() == UnitTypes::Zerg_Zergling)
+                {
+                    for (const auto& l : u->getLarva() )
+                    {
+                        if ( !l->morph(UnitTypes::Zerg_Zergling) )
+                        {
+                            lastErr = Broodwar->getLastError();
+                        }
+                        lackingLarva = false;
+                        zerglingLastChecked = Broodwar->getFrameCount();
                         break; // break the foor loop of larva
                     }
                 }
@@ -252,6 +271,14 @@ void ExampleAIModule::onFrame()
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
         logMessegeOnScreen("Pushed drone because drones are few");
     }
+    if (lackingLarva && currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT &&
+        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Hatchery) == 0 &&
+        Broodwar->getFrameCount() - hatcheryLastPushed > HATCHERY_CHECK_INTERVAL)
+    {
+        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Hatchery));
+        hatcheryLastPushed = Broodwar->getFrameCount();
+        logMessegeOnScreen("Pushed a Hatchery since lacking larva.");
+    }
     if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) >= FIRST_SPAWNING &&
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
         taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Spawning_Pool) == -1 &&
@@ -259,6 +286,13 @@ void ExampleAIModule::onFrame()
     {
         taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Spawning_Pool));
         logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
+    }
+    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0 &&
+        Broodwar->getFrameCount() - zerglingLastChecked > ZERGLING_CHECK_INTERVAL &&
+        taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Zergling) == -1)
+    {
+        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Zergling));
+        logMessegeOnScreen("push a pair of zergling");
     }
 
 
