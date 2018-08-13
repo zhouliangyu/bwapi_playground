@@ -2,22 +2,11 @@
 #include <iostream>
 #include "TaskQueue.h"
 #include "PositionQueue.h"
+#include "DevelopTools.h"
 
 using namespace BWAPI;
 using namespace Filter;
 
-// Developing module
-const bool IS_DEVELOPING = true;
-const int LOG_MESSEGE_INTERVAL = 50; int messegeLastLogged = 0;
-void logMessegeOnScreen(const char* s, int i=0)
-{
-    if (!IS_DEVELOPING) return;
-    if (Broodwar->getFrameCount() - messegeLastLogged > LOG_MESSEGE_INTERVAL)
-    {
-        Broodwar->sendTextEx(true,"%s(%d)", s, i);
-        messegeLastLogged = Broodwar->getFrameCount();
-    }
-}
 
 // initiation of system wide variables
 TaskQueue taskQueue;
@@ -53,7 +42,7 @@ void ExampleAIModule::onStart()
         if ( Broodwar->enemy() )
             Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone)); // onStart, push a worker
-        logMessegeOnScreen("On start of game pushed a drone");
+        DevelopTools::logMessegeOnScreen("On start of game pushed a drone");
         positionQueue.addStartingLocations();
     }
 }
@@ -241,7 +230,7 @@ void ExampleAIModule::onFrame()
             Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Overlord) == 0)
         {
             taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord));
-            logMessegeOnScreen("Pushed overlord because of the Insufficient_Supply error");
+            DevelopTools::logMessegeOnScreen("Pushed overlord because of the Insufficient_Supply error");
             overlordLastChecked = Broodwar->getFrameCount();
         }
         lastErr = Errors::None;
@@ -256,7 +245,7 @@ void ExampleAIModule::onFrame()
     {
         taskQueue.push(TaskItem(TaskCategories::SCOUT_MAP));
         lastSendScout = Broodwar->getFrameCount();
-        logMessegeOnScreen("Add a scouting task");
+        DevelopTools::logMessegeOnScreen("Add a scouting task");
     }
 
     // add new build tasks
@@ -269,7 +258,7 @@ void ExampleAIModule::onFrame()
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Drone) == 0)
     {
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
-        logMessegeOnScreen("Pushed drone because drones are few");
+        DevelopTools::logMessegeOnScreen("Pushed drone because drones are few");
     }
     if (lackingLarva && currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT &&
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Hatchery) == 0 &&
@@ -277,7 +266,7 @@ void ExampleAIModule::onFrame()
     {
         taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Hatchery));
         hatcheryLastPushed = Broodwar->getFrameCount();
-        logMessegeOnScreen("Pushed a Hatchery since lacking larva.");
+        DevelopTools::logMessegeOnScreen("Pushed a Hatchery since lacking larva.");
     }
     if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) >= FIRST_SPAWNING &&
         Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
@@ -285,14 +274,14 @@ void ExampleAIModule::onFrame()
         Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
     {
         taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Spawning_Pool));
-        logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
+        DevelopTools::logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
     }
     if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0 &&
         Broodwar->getFrameCount() - zerglingLastChecked > ZERGLING_CHECK_INTERVAL &&
         taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Zergling) == -1)
     {
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Zergling));
-        logMessegeOnScreen("push a pair of zergling");
+        DevelopTools::logMessegeOnScreen("push a pair of zergling");
     }
 
 
