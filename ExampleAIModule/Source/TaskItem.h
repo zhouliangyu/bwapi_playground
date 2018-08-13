@@ -8,6 +8,7 @@ enum class TaskCategories
 {
     TRAIN_UNIT,
     BUILD_UNIT,
+    SCOUT_MAP,
     NONE
 };
 
@@ -22,4 +23,5 @@ class TaskItem
         TaskCategories getTaskCategory();
         UnitType getRelatedUnit() const;
         int getMineralRequired();
+        bool setRelatedUnit(const UnitType& u);
 };

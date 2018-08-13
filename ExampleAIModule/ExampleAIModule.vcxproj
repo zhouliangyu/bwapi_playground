@@ -94,11 +94,13 @@
     <ClCompile Include="Source\ExampleAIModule.cpp" />
     <ClCompile Include="Source\TaskItem.cpp" />
     <ClCompile Include="Source\TaskQueue.cpp" />
+    <ClCompile Include="Source\PositionQueue.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\ExampleAIModule.h" />
     <ClInclude Include="Source\TaskItem.h" />
     <ClInclude Include="Source\TaskQueue.h" />
+    <ClInclude Include="Source\PositionQueue.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -1,25 +1,27 @@
 #include "ExampleAIModule.h"
 #include <iostream>
 #include "TaskQueue.h"
+#include "PositionQueue.h"
 
 using namespace BWAPI;
 using namespace Filter;
 
-// initiation of system wide variables
+// Developing module
 const bool IS_DEVELOPING = true;
-const int LOG_MESSEGE_INTERVAL = 100; int messegeLastLogged = 0;
-void logMessegeOnScreen(const std::string& s, int i=0)
+const int LOG_MESSEGE_INTERVAL = 50; int messegeLastLogged = 0;
+void logMessegeOnScreen(const char* s, int i=0)
 {
     if (!IS_DEVELOPING) return;
     if (Broodwar->getFrameCount() - messegeLastLogged > LOG_MESSEGE_INTERVAL)
     {
-        Broodwar->sendTextEx(true,"%s(%d)", s.c_str(), i);
+        Broodwar->sendTextEx(true,"%s(%d)", s, i);
         messegeLastLogged = Broodwar->getFrameCount();
     }
 }
 
-
+// initiation of system wide variables
 TaskQueue taskQueue;
+PositionQueue positionQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
 const int AUTO_BUILD_RANGE = 1000;
@@ -27,6 +29,7 @@ const int FIRST_SPAWNING = 6;
 int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 const int MINERAL_BUFFER = 0;
+bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 500;
 
 void ExampleAIModule::onStart()
 {
@@ -49,6 +52,7 @@ void ExampleAIModule::onStart()
             Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone)); // onStart, push a worker
         logMessegeOnScreen("On start of game pushed a drone");
+        positionQueue.addStartingLocations();
     }
 }
 
@@ -62,6 +66,7 @@ void ExampleAIModule::onEnd(bool isWinner)
 void ExampleAIModule::onFrame()
 {
     Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
+    Broodwar->drawTextScreen(250, 0,  "APM: %d", Broodwar->getAPM() );
     Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
     if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
         return;
@@ -76,9 +81,26 @@ void ExampleAIModule::onFrame()
     {
         currTask = taskQueue.pop();
     }
+    // asign scouter type
+    if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
+    {
+        isScoutSent = false;
+        if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
+        {
+            currTask.setRelatedUnit(UnitTypes::Zerg_Overlord);
+        }
+        else if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Zergling) == 0)
+        {
+            currTask.setRelatedUnit(UnitTypes::Zerg_Drone);
+        }
+        else
+        {
+            currTask.setRelatedUnit(UnitTypes::Zerg_Zergling);
+        }
+    }
     if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
         isBuildingDeployed = false;
-
+    // loop through all units
     for (auto &u : Broodwar->self()->getUnits())
     {
         // Make sure to include this block when handling any Unit pointer!
@@ -90,6 +112,25 @@ void ExampleAIModule::onFrame()
             continue;
         if ( !u->isCompleted() || u->isConstructing() )
             continue;
+        if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
+        {
+            if (u->getType() == currTask.getRelatedUnit())
+            {
+                if (!isScoutSent && (u->isIdle() || u->getType() == UnitTypes::Zerg_Drone))
+                {
+                    for (int i=positionQueue.getPositionQueueSize()-1; i>=0; --i)
+                    {
+                        if (!u->move(positionQueue.getPosition(i), (i!=positionQueue.getPositionQueueSize()-1)))
+                        {
+                            lastErr = Broodwar->getLastError();
+                            break;
+                        }
+                        isScoutSent = true;
+                        lastSendScout = Broodwar->getFrameCount();
+                    }
+                }
+            }
+        }
         // If the unit is a worker unit
         if ( u->getType().isWorker() )
         {
@@ -191,7 +232,15 @@ void ExampleAIModule::onFrame()
     {
     }
 
-    // push new units
+    // add new tasks 
+    if (Broodwar->getFrameCount() - lastSendScout > SCOUT_INTERVAL)
+    {
+        taskQueue.push(TaskItem(TaskCategories::SCOUT_MAP));
+        lastSendScout = Broodwar->getFrameCount();
+        logMessegeOnScreen("Add a scouting task");
+    }
+
+    // add new build tasks
     if (!isBuildingDeployed || Broodwar->getFrameCount() - suspensionLastCheck < SUSPENSION_INTERVAL) return;
     if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) *
         DRONE_BOUNDARY_FACTOR || (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +

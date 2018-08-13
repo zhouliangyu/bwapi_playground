@@ -6,7 +6,6 @@
 using namespace BWAPI;
 using namespace Filter;
 
-
 class TaskQueue
 {
     private:

@@ -13,6 +13,8 @@ TaskItem::TaskItem(const TaskCategories& t, const UnitType& u) :
         case UnitTypes::Zerg_Spawning_Pool:
             m_mineralRequired = 200;
             break;
+        default:
+            m_mineralRequired = 0;
     }
 }
 TaskCategories TaskItem::getTaskCategory()
@@ -26,4 +28,10 @@ UnitType TaskItem::getRelatedUnit() const
 int TaskItem::getMineralRequired()
 {
     return m_mineralRequired;
+}
+
+bool TaskItem::setRelatedUnit(const UnitType& u)
+{
+    m_relatedUnit = u;
+    return true;
 }
