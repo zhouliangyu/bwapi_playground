@@ -1,5 +1,7 @@
 #include <BWAPI.h>
 #include "DevelopTools.h"
+#include <cstdlib>
+#include <ctime>
 
 using namespace BWAPI;
 using namespace Filter;
@@ -16,4 +18,11 @@ void DevelopTools::logMessegeOnScreen(const char* s, int i)
         Broodwar->sendTextEx(true,"%s(%d)", s, i);
         messegeLastLogged = Broodwar->getFrameCount();
     }
+}
+
+int DevelopTools::randMinMax(int minBoundary, int maxBoundary)
+{
+    if (minBoundary > maxBoundary) return 0;
+    srand(static_cast<int>(time(NULL)));
+    return (rand() % (maxBoundary-minBoundary+1))+minBoundary;
 }

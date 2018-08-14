@@ -13,7 +13,7 @@ PositionQueue positionQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
 int zerglingLastChecked = 0; const int ZERGLING_CHECK_INTERVAL = 470;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
-const int FIRST_SPAWNING = 6;
+int FIRST_SPAWNING = DevelopTools::randMinMax(4, 12);
 int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 600;
@@ -55,15 +55,14 @@ void ExampleAIModule::onEnd(bool isWinner)
 
 void ExampleAIModule::onFrame()
 {
-    Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
-    Broodwar->drawTextScreen(250, 0,  "APM: %d", Broodwar->getAPM() );
-    Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
+    Broodwar->drawTextScreen(300, 0,  "FPS: %d", Broodwar->getFPS() );
+    Broodwar->drawTextScreen(350, 0,  "APM: %d", Broodwar->getAPM() );
+    Broodwar->drawTextScreen(300, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
 
     if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
-    taskQueue.updateOnScreen();
     // variable initiation for each frame
     TaskItem currTask;
     Error lastErr = Errors::None;
@@ -72,6 +71,7 @@ void ExampleAIModule::onFrame()
     if (taskQueue.getQueueSize() > 0) currTask = taskQueue.pop();
     if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
         isBuildingDeployed = false;
+    taskQueue.updateOnScreen();
     // assign scouter type
     if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
     {
@@ -130,6 +130,10 @@ void ExampleAIModule::onFrame()
                 if (currTask.getMineralRequired() >= Broodwar->self()->minerals())
                 {
                     lastErr = Errors::Insufficient_Minerals;
+                }
+                else if (currTask.getGasRequired() >= Broodwar->self()->gas())
+                {
+                    lastErr = Errors::Insufficient_Gas;
                 }
                 else
                 {
@@ -207,6 +211,14 @@ void ExampleAIModule::onFrame()
     }
     if (lastErr == Errors::Insufficient_Gas)
     {
+        if (Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Extractor) == 0 &&
+            taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Extractor) == -1)
+        {
+            taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Extractor));
+            DevelopTools::logMessegeOnScreen("Pushed a gas extractor because of Insufficient_Gas error");
+        }
+        lastErr = Errors::None;
+        return;
     }
 
     // add new tasks 
@@ -246,11 +258,19 @@ void ExampleAIModule::onFrame()
         DevelopTools::logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
     }
     if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0 &&
+        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
         Broodwar->getFrameCount() - zerglingLastChecked > ZERGLING_CHECK_INTERVAL &&
         taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Zergling) == -1)
     {
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Zergling));
+        zerglingLastChecked = Broodwar->getFrameCount();
         DevelopTools::logMessegeOnScreen("push a pair of zergling");
+    }
+    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hydralisk_Den) == 0 &&
+        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Hydralisk_Den) == 0 &&
+        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0)
+    {
+        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Hydralisk_Den));
     }
 
 

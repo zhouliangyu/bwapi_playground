@@ -24,7 +24,8 @@ bool TaskQueue::updateOnScreen()
     else
     {
         Broodwar->registerEvent([=](Game*){ Broodwar->drawTextScreen(0,
-            0, "Stack [%d]:[%s]", getQueueSize(), m_taskQueue[getQueueSize()-1].getRelatedUnit().c_str()); },   // action
+            0, "Stack [%d]:{%s}[%s]", getQueueSize(), m_taskQueue[getQueueSize()-1].getTaskCStr(),
+            m_taskQueue[getQueueSize()-1].getRelatedUnit().c_str()); },   // action
             nullptr,    // condition
             Broodwar->getLatencyFrames());  // frames to run
         return true;
