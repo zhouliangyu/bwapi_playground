@@ -204,6 +204,36 @@ void ExampleAIModule::onFrame()
             }
         }
 
+        // if the unit is a extractor
+        if (u->getType() == UnitTypes::Zerg_Extractor)
+        {
+            Region r = u->getRegion();
+            if (r)
+            {
+                int workerThatGatheringGas = 0;
+                for (const auto& uu : r->getUnits())
+                {
+                    if (!uu) continue;
+                    if (uu->getType().isWorker() && uu->isGatheringGas())
+                        ++workerThatGatheringGas;
+                }
+                if (workerThatGatheringGas < 4)
+                {
+                    int moreWorkerForGas = 4 - workerThatGatheringGas;
+                    for (const auto& uu : r->getUnits())
+                    {
+                        if (!uu) continue;
+                        if (uu->getType().isWorker() && !uu->isGatheringGas())
+                        {
+                            uu->gather(u);
+                            --moreWorkerForGas;
+                            if (moreWorkerForGas <= 0 ) break;
+                        }
+                    }
+                }
+            }
+        }
+
     } // end of unit loop
     
     // Error handling
@@ -288,12 +318,6 @@ void ExampleAIModule::onFrame()
         taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Zergling));
         zerglingLastChecked = Broodwar->getFrameCount();
         DevelopTools::logMessegeOnScreen("push a pair of zergling");
-    }
-    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hydralisk_Den) == 0 &&
-        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Hydralisk_Den) == 0 &&
-        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0)
-    {
-        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Hydralisk_Den));
     }
 
 
