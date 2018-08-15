@@ -13,7 +13,7 @@ PositionQueue positionQueue;
 int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
 int zerglingLastChecked = 0; const int ZERGLING_CHECK_INTERVAL = 470;
 const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
-int FIRST_SPAWNING = DevelopTools::randMinMax(4, 12);
+int FIRST_SPAWNING = DevelopTools::randMinMax(4, 8);
 int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 600;
@@ -127,11 +127,11 @@ void ExampleAIModule::onFrame()
         {
             if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
             {
-                if (currTask.getMineralRequired() >= Broodwar->self()->minerals())
+                if (currTask.getMineralRequired() > Broodwar->self()->minerals())
                 {
                     lastErr = Errors::Insufficient_Minerals;
                 }
-                else if (currTask.getGasRequired() >= Broodwar->self()->gas())
+                else if (currTask.getGasRequired() > Broodwar->self()->gas())
                 {
                     lastErr = Errors::Insufficient_Gas;
                 }
@@ -139,7 +139,27 @@ void ExampleAIModule::onFrame()
                 {
                     if (!isBuildingDeployed)
                     {
-                        if (!u->build(currTask.getRelatedUnit(),
+                        if (currTask.getRelatedUnit() == UnitTypes::Zerg_Extractor)
+                        {
+                            bool extractorHasBuild = false;
+                            Region r = u->getRegion();
+                            if (r)
+                            {
+                                for (const auto& uu : r->getUnits())
+                                {
+                                    if (!uu->exists()) continue;
+                                    if (uu->getType() == UnitTypes::Resource_Vespene_Geyser)
+                                    {
+                                        DevelopTools::logMessegeOnScreen("Have found a vespene geyser!");
+                                        if (!u->build(UnitTypes::Zerg_Extractor, uu->getTilePosition()))
+                                            lastErr = Broodwar->getLastError();
+                                        extractorHasBuild = true;
+                                    }
+                                    if (extractorHasBuild) break;
+                                }
+                            }
+                        }
+                        else if (!u->build(currTask.getRelatedUnit(),
                             Broodwar->getBuildLocation(currTask.getRelatedUnit(),
                                 u->getTilePosition())))
                         {
@@ -211,6 +231,9 @@ void ExampleAIModule::onFrame()
     }
     if (lastErr == Errors::Insufficient_Gas)
     {
+        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT ||
+            currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
+            taskQueue.push(currTask);
         if (Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Extractor) == 0 &&
             taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Extractor) == -1)
         {
