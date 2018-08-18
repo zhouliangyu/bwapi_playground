@@ -63,6 +63,8 @@ void ExampleAIModule::onFrame()
         return;
     if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
         return;
+
+
     // variable initiation for each frame
     TaskItem currTask;
     Error lastErr = Errors::None;
