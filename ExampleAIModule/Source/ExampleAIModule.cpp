@@ -1,127 +1,15 @@
 #include "ExampleAIModule.h"
 #include <iostream>
+#include "GameStrategy.h"
 
 using namespace BWAPI;
 using namespace Filter;
-
-void ExampleAIModule::onStart()
-{
-    Broodwar->sendText("Hello world!");
-    Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;
-    Broodwar->enableFlag(Flag::UserInput);
-    Broodwar->setCommandOptimizationLevel(2);
-    if ( Broodwar->isReplay() )
-    {
-        Broodwar << "The following players are in this replay:" << std::endl;
-        Playerset players = Broodwar->getPlayers();
-        for(auto p : players)
-        {
-            if ( !p->isObserver() )
-                Broodwar << p->getName() << ", playing as " << p->getRace() << std::endl;
-        }
-
-    }
-    else // if this is not a replay
-    {
-        if ( Broodwar->enemy() ) // First make sure there is an enemy
-            Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
-    }
-
-}
 
 void ExampleAIModule::onEnd(bool isWinner)
 {
     if ( isWinner )
     {
     }
-}
-
-void ExampleAIModule::onFrame()
-{
-    Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
-    Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
-    if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
-        return;
-    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
-        return;
-
-    for (auto &u : Broodwar->self()->getUnits())
-    {
-        if ( !u->exists() )
-            continue;
-        if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
-            continue;
-        if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
-            continue;
-        if ( !u->isCompleted() || u->isConstructing() )
-            continue;
-
-        if ( u->getType().isWorker() )
-        {
-            if ( u->isIdle() )
-            {
-                if ( u->isCarryingGas() || u->isCarryingMinerals() )
-                {
-                    u->returnCargo();
-                }
-                else if ( !u->getPowerUp() )  // The worker cannot harvest anything if it
-                {                             // is carrying a powerup such as a flag
-                    if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
-                    {
-                        Broodwar << Broodwar->getLastError() << std::endl;
-                    }
-                } // closure: has no powerup
-            } // closure: if idle
-
-        }
-        else if ( u->getType().isResourceDepot() ) // A resource depot is a Command Center, Nexus, or Hatchery
-        {
-            if ( u->isIdle() && !u->train(u->getType().getRace().getWorker()) )
-            {
-                Position pos = u->getPosition();
-                Error lastErr = Broodwar->getLastError();
-                Broodwar->registerEvent([pos,lastErr](Game*){ Broodwar->drawTextMap(pos, "%c%s", Text::White, lastErr.c_str()); },   // action
-                        nullptr,    // condition
-                        Broodwar->getLatencyFrames());  // frames to run
-                UnitType supplyProviderType = u->getType().getRace().getSupplyProvider();
-                static int lastChecked = 0;
-                if (  lastErr == Errors::Insufficient_Supply &&
-                        lastChecked + 400 < Broodwar->getFrameCount() &&
-                        Broodwar->self()->incompleteUnitCount(supplyProviderType) == 0 )
-                {
-                    lastChecked = Broodwar->getFrameCount();
-                    Unit supplyBuilder = u->getClosestUnit(  GetType == supplyProviderType.whatBuilds().first &&
-                            (IsIdle || IsGatheringMinerals) &&
-                            IsOwned);
-                    if ( supplyBuilder )
-                    {
-                        if ( supplyProviderType.isBuilding() )
-                        {
-                            TilePosition targetBuildLocation = Broodwar->getBuildLocation(supplyProviderType, supplyBuilder->getTilePosition());
-                            if ( targetBuildLocation )
-                            {
-                                Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*)
-                                        {
-                                        Broodwar->drawBoxMap( Position(targetBuildLocation),
-                                                Position(targetBuildLocation + supplyProviderType.tileSize()),
-                                                Colors::Blue);
-                                        },
-                                        nullptr,  // condition
-                                        supplyProviderType.buildTime() + 100 );  // frames to run
-                                supplyBuilder->build( supplyProviderType, targetBuildLocation );
-                            }
-                        }
-                        else
-                        {
-                            supplyBuilder->train( supplyProviderType );
-                        }
-                    } // closure: supplyBuilder is valid
-                } // closure: insufficient supply
-            } // closure: failed to train idle unit
-
-        }
-
-    } // closure: unit iterator
 }
 
 void ExampleAIModule::onSendText(std::string text)
@@ -211,3 +99,58 @@ void ExampleAIModule::onSaveGame(std::string gameName)
 void ExampleAIModule::onUnitComplete(BWAPI::Unit unit)
 {
 }
+
+// ********************************************************
+
+GameStrategy game;
+
+// ********************************************************
+
+
+void ExampleAIModule::onStart()
+{
+    Broodwar->enableFlag(Flag::UserInput);
+    Broodwar->setCommandOptimizationLevel(2);
+    if (Broodwar->self()->getRace() != Races::Zerg) Broodwar->restartGame();
+}
+
+void ExampleAIModule::onFrame()
+{
+    Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
+    Broodwar->drawTextScreen(200, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
+    if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
+        return;
+    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
+        return;
+
+    for (auto &u : Broodwar->self()->getUnits())
+    {
+        if ( !u->exists() )
+            continue;
+        if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
+            continue;
+        if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
+            continue;
+        if ( !u->isCompleted() || u->isConstructing() )
+            continue;
+        if ( u->getType().isWorker() )
+        {
+            if ( u->isIdle() )
+            {
+                if ( u->isCarryingGas() || u->isCarryingMinerals() )
+                {
+                    u->returnCargo();
+                }
+                else if ( !u->getPowerUp() )  // The worker cannot harvest anything if it
+                {                             // is carrying a powerup such as a flag
+                    if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
+                    {
+                        Broodwar << Broodwar->getLastError() << std::endl;
+                    }
+                } // closure: has no powerup
+            } // closure: if idle
+        }
+    } // closure: unit iterator
+    if (game.needTrainDrone()) game.trainUnit(UnitTypes::Zerg_Drone);
+}
+
