@@ -18,6 +18,8 @@ int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
 bool isBuildingDeployed = true;
 bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 600;
 bool lackingLarva = false; int hatcheryLastPushed = 0; const int HATCHERY_CHECK_INTERVAL = 600;
+const int SPREAD_MINERAL_BOUNDARY = 600;
+const int SPREAD_DISTANCE_BOT_BOUNDARY = 1000; const int SPREAD_DISTANCE_UP_BOUNDARY = 3200;
 
 void ExampleAIModule::onStart()
 {
@@ -158,6 +160,28 @@ void ExampleAIModule::onFrame()
                                         extractorHasBuild = true;
                                     }
                                     if (extractorHasBuild) break;
+                                }
+                            }
+                        }
+                        else if (currTask.getRelatedUnit() == UnitTypes::Zerg_Hatchery)
+                        {
+                            bool spreadHatcheryBuild = false;
+                            if (Broodwar->self()->minerals() < SPREAD_MINERAL_BOUNDARY)
+                            {
+                                Unitset allMinerals = Broodwar->getMinerals();
+                                for (const auto& uu : allMinerals)
+                                {
+                                    if (!uu->exists()) continue;
+                                    if (SPREAD_DISTANCE_BOT_BOUNDARY < uu->getDistance(u) &&
+                                        uu->getDistance(u) < SPREAD_DISTANCE_UP_BOUNDARY)
+                                    {
+                                        DevelopTools::logMessegeOnScreen("Found a close spot of minerals!");
+                                        if (!u->build(UnitTypes::Zerg_Hatchery,
+                                            Broodwar->getBuildLocation(UnitTypes::Zerg_Hatchery, uu->getTilePosition())))
+                                            lastErr = Broodwar->getLastError();
+                                        spreadHatcheryBuild = true;
+                                    }
+                                    if (spreadHatcheryBuild) break;
                                 }
                             }
                         }
