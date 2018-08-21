@@ -1,360 +1,202 @@
 #include "ExampleAIModule.h"
 #include <iostream>
-#include "TaskQueue.h"
-#include "PositionQueue.h"
-#include "DevelopTools.h"
 
 using namespace BWAPI;
 using namespace Filter;
 
-// initiation of system wide variables
-TaskQueue taskQueue;
-PositionQueue positionQueue;
-int overlordLastChecked = 0; const int OVERLORD_CHECK_INTERVAL = 650;
-int zerglingLastChecked = 0; const int ZERGLING_CHECK_INTERVAL = 470;
-const int DRONE_BOUNDARY_FACTOR = 3; const int DRONE_EVERY_BASE = 20;
-int FIRST_SPAWNING = DevelopTools::randMinMax(4, 8);
-int suspensionLastCheck = 0; const int SUSPENSION_INTERVAL = 200;
-bool isBuildingDeployed = true;
-bool isScoutSent = false; int lastSendScout = 0; const int SCOUT_INTERVAL = 600;
-bool lackingLarva = false; int hatcheryLastPushed = 0; const int HATCHERY_CHECK_INTERVAL = 600;
-const int SPREAD_MINERAL_BOUNDARY = 600;
-const int SPREAD_DISTANCE_BOT_BOUNDARY = 1000; const int SPREAD_DISTANCE_UP_BOUNDARY = 3200;
-
 void ExampleAIModule::onStart()
 {
-    if (Broodwar->self()->getRace() != Races::Zerg) Broodwar->restartGame();
-    Broodwar->enableFlag(Flag::UserInput);
-    Broodwar->setCommandOptimizationLevel(2);
-    if ( Broodwar->isReplay() )
+  // Hello World!
+  Broodwar->sendText("Hello world!");
+
+  // Print the map name.
+  // BWAPI returns std::string when retrieving a string, don't forget to add .c_str() when printing!
+  Broodwar << "The map is " << Broodwar->mapName() << "!" << std::endl;
+
+  // Enable the UserInput flag, which allows us to control the bot and type messages.
+  Broodwar->enableFlag(Flag::UserInput);
+
+  // Uncomment the following line and the bot will know about everything through the fog of war (cheat).
+  //Broodwar->enableFlag(Flag::CompleteMapInformation);
+
+  // Set the command optimization level so that common commands can be grouped
+  // and reduce the bot's APM (Actions Per Minute).
+  Broodwar->setCommandOptimizationLevel(2);
+
+  // Check if this is a replay
+  if ( Broodwar->isReplay() )
+  {
+
+    // Announce the players in the replay
+    Broodwar << "The following players are in this replay:" << std::endl;
+    
+    // Iterate all the players in the game using a std:: iterator
+    Playerset players = Broodwar->getPlayers();
+    for(auto p : players)
     {
-        Broodwar << "The following players are in this replay:" << std::endl;
-        Playerset players = Broodwar->getPlayers();
-        for(auto p : players)
-        {
-            if ( !p->isObserver() )
-                Broodwar << p->getName() << ", playing as " << p->getRace() << std::endl;
-        }
+      // Only print the player if they are not an observer
+      if ( !p->isObserver() )
+        Broodwar << p->getName() << ", playing as " << p->getRace() << std::endl;
     }
-    else
-    {
-        if ( Broodwar->enemy() )
-            Broodwar << "The matchup is " << Broodwar->self()->getRace() <<
-                " vs " << Broodwar->enemy()->getRace() << std::endl;
-        // when game starts, push a drone
-        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
-        DevelopTools::logMessegeOnScreen("On start of game pushed a drone");
-        positionQueue.addStartingLocations();
-    }
+
+  }
+  else // if this is not a replay
+  {
+    // Retrieve you and your enemy's races. enemy() will just return the first enemy.
+    // If you wish to deal with multiple enemies then you must use enemies().
+    if ( Broodwar->enemy() ) // First make sure there is an enemy
+      Broodwar << "The matchup is " << Broodwar->self()->getRace() << " vs " << Broodwar->enemy()->getRace() << std::endl;
+  }
+
 }
 
 void ExampleAIModule::onEnd(bool isWinner)
 {
-    if ( isWinner )
-    {
-    }
+  // Called when the game ends
+  if ( isWinner )
+  {
+    // Log your win here!
+  }
 }
 
 void ExampleAIModule::onFrame()
 {
-    Broodwar->drawTextScreen(300, 0,  "FPS: %d", Broodwar->getFPS() );
-    Broodwar->drawTextScreen(350, 0,  "APM: %d", Broodwar->getAPM() );
-    Broodwar->drawTextScreen(300, 10, "Average FPS: %f", Broodwar->getAverageFPS() );
+  // Called once every game frame
 
-    if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
-        return;
-    if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
-        return;
+  // Display the game frame rate as text in the upper left area of the screen
+  Broodwar->drawTextScreen(200, 0,  "FPS: %d", Broodwar->getFPS() );
+  Broodwar->drawTextScreen(200, 20, "Average FPS: %f", Broodwar->getAverageFPS() );
+
+  // Return if the game is a replay or is paused
+  if ( Broodwar->isReplay() || Broodwar->isPaused() || !Broodwar->self() )
+    return;
+
+  // Prevent spamming by only running our onFrame once every number of latency frames.
+  // Latency frames are the number of frames before commands are processed.
+  if ( Broodwar->getFrameCount() % Broodwar->getLatencyFrames() != 0 )
+    return;
+
+  // Iterate through all the units that we own
+  for (auto &u : Broodwar->self()->getUnits())
+  {
+    // Ignore the unit if it no longer exists
+    // Make sure to include this block when handling any Unit pointer!
+    if ( !u->exists() )
+      continue;
+
+    // Ignore the unit if it has one of the following status ailments
+    if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
+      continue;
+
+    // Ignore the unit if it is in one of the following states
+    if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
+      continue;
+
+    // Ignore the unit if it is incomplete or busy constructing
+    if ( !u->isCompleted() || u->isConstructing() )
+      continue;
 
 
-    // variable initiation for each frame
-    TaskItem currTask;
-    Error lastErr = Errors::None;
-    lackingLarva = true;
-    // on every frame, pop out a task
-    if (taskQueue.getQueueSize() > 0) currTask = taskQueue.pop();
-    if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
-        isBuildingDeployed = false;
-    taskQueue.updateOnScreen();
-    // assign scouter type
-    if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
+    // Finally make the unit do some stuff!
+
+
+    // If the unit is a worker unit
+    if ( u->getType().isWorker() )
     {
-        isScoutSent = false;
-        if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
+      // if our worker is idle
+      if ( u->isIdle() )
+      {
+        // Order workers carrying a resource to return them to the center,
+        // otherwise find a mineral patch to harvest.
+        if ( u->isCarryingGas() || u->isCarryingMinerals() )
         {
-            currTask.setRelatedUnit(UnitTypes::Zerg_Overlord);
+          u->returnCargo();
         }
-        else if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Zergling) == 0)
-        {
-            currTask.setRelatedUnit(UnitTypes::Zerg_Drone);
-        }
-        else
-        {
-            currTask.setRelatedUnit(UnitTypes::Zerg_Zergling);
-        }
+        else if ( !u->getPowerUp() )  // The worker cannot harvest anything if it
+        {                             // is carrying a powerup such as a flag
+          // Harvest from the nearest mineral patch or gas refinery
+          if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
+          {
+            // If the call fails, then print the last error message
+            Broodwar << Broodwar->getLastError() << std::endl;
+          }
+
+        } // closure: has no powerup
+      } // closure: if idle
+
     }
-    // loop through all units
-    for (auto &u : Broodwar->self()->getUnits())
+    else if ( u->getType().isResourceDepot() ) // A resource depot is a Command Center, Nexus, or Hatchery
     {
-        // Make sure to include this block when handling any Unit pointer!
-        if ( !u->exists() )
-            continue;
-        if ( u->isLockedDown() || u->isMaelstrommed() || u->isStasised() )
-            continue;
-        if ( u->isLoaded() || !u->isPowered() || u->isStuck() )
-            continue;
-        if ( !u->isCompleted() || u->isConstructing() )
-            continue;
-        // assign scouter
-        if (currTask.getTaskCategory() == TaskCategories::SCOUT_MAP)
+
+      // Order the depot to construct more workers! But only when it is idle.
+      if ( u->isIdle() && !u->train(u->getType().getRace().getWorker()) )
+      {
+        // If that fails, draw the error at the location so that you can visibly see what went wrong!
+        // However, drawing the error once will only appear for a single frame
+        // so create an event that keeps it on the screen for some frames
+        Position pos = u->getPosition();
+        Error lastErr = Broodwar->getLastError();
+        Broodwar->registerEvent([pos,lastErr](Game*){ Broodwar->drawTextMap(pos, "%c%s", Text::White, lastErr.c_str()); },   // action
+                                nullptr,    // condition
+                                Broodwar->getLatencyFrames());  // frames to run
+
+        // Retrieve the supply provider type in the case that we have run out of supplies
+        UnitType supplyProviderType = u->getType().getRace().getSupplyProvider();
+        static int lastChecked = 0;
+
+        // If we are supply blocked and haven't tried constructing more recently
+        if (  lastErr == Errors::Insufficient_Supply &&
+              lastChecked + 400 < Broodwar->getFrameCount() &&
+              Broodwar->self()->incompleteUnitCount(supplyProviderType) == 0 )
         {
-            if (u->getType() == currTask.getRelatedUnit())
+          lastChecked = Broodwar->getFrameCount();
+
+          // Retrieve a unit that is capable of constructing the supply needed
+          Unit supplyBuilder = u->getClosestUnit(  GetType == supplyProviderType.whatBuilds().first &&
+                                                    (IsIdle || IsGatheringMinerals) &&
+                                                    IsOwned);
+          // If a unit was found
+          if ( supplyBuilder )
+          {
+            if ( supplyProviderType.isBuilding() )
             {
-                if (!isScoutSent && (u->isIdle() || u->getType() == UnitTypes::Zerg_Drone))
-                {
-                    for (int i=positionQueue.getPositionQueueSize()-1; i>=0; --i)
-                    {
-                        if (!u->move(positionQueue.getPosition(i),
-                            (i!=positionQueue.getPositionQueueSize()-1)))
-                        {
-                            lastErr = Broodwar->getLastError();
-                            break;
-                        }
-                        isScoutSent = true;
-                        lastSendScout = Broodwar->getFrameCount();
-                    }
-                }
+              TilePosition targetBuildLocation = Broodwar->getBuildLocation(supplyProviderType, supplyBuilder->getTilePosition());
+              if ( targetBuildLocation )
+              {
+                // Register an event that draws the target build location
+                Broodwar->registerEvent([targetBuildLocation,supplyProviderType](Game*)
+                                        {
+                                          Broodwar->drawBoxMap( Position(targetBuildLocation),
+                                                                Position(targetBuildLocation + supplyProviderType.tileSize()),
+                                                                Colors::Blue);
+                                        },
+                                        nullptr,  // condition
+                                        supplyProviderType.buildTime() + 100 );  // frames to run
+
+                // Order the builder to construct the supply structure
+                supplyBuilder->build( supplyProviderType, targetBuildLocation );
+              }
             }
-        }
-        // If the unit is a worker unit
-        if ( u->getType().isWorker() )
-        {
-            if (currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
+            else
             {
-                if (currTask.getMineralRequired() > Broodwar->self()->minerals())
-                {
-                    lastErr = Errors::Insufficient_Minerals;
-                }
-                else if (currTask.getGasRequired() > Broodwar->self()->gas())
-                {
-                    lastErr = Errors::Insufficient_Gas;
-                }
-                else
-                {
-                    if (!isBuildingDeployed)
-                    {
-                        if (currTask.getRelatedUnit() == UnitTypes::Zerg_Extractor)
-                        {
-                            bool extractorHasBuild = false;
-                            Region r = u->getRegion();
-                            if (r)
-                            {
-                                for (const auto& uu : r->getUnits())
-                                {
-                                    if (!uu->exists()) continue;
-                                    if (uu->getType() == UnitTypes::Resource_Vespene_Geyser)
-                                    {
-                                        DevelopTools::logMessegeOnScreen("Have found a vespene geyser!");
-                                        if (!u->build(UnitTypes::Zerg_Extractor, uu->getTilePosition()))
-                                            lastErr = Broodwar->getLastError();
-                                        extractorHasBuild = true;
-                                    }
-                                    if (extractorHasBuild) break;
-                                }
-                            }
-                        }
-                        else if (currTask.getRelatedUnit() == UnitTypes::Zerg_Hatchery)
-                        {
-                            bool spreadHatcheryBuild = false;
-                            if (Broodwar->self()->minerals() < SPREAD_MINERAL_BOUNDARY)
-                            {
-                                Unitset allMinerals = Broodwar->getMinerals();
-                                for (const auto& uu : allMinerals)
-                                {
-                                    if (!uu->exists()) continue;
-                                    if (SPREAD_DISTANCE_BOT_BOUNDARY < uu->getDistance(u) &&
-                                        uu->getDistance(u) < SPREAD_DISTANCE_UP_BOUNDARY)
-                                    {
-                                        DevelopTools::logMessegeOnScreen("Found a close spot of minerals!");
-                                        if (!u->build(UnitTypes::Zerg_Hatchery,
-                                            Broodwar->getBuildLocation(UnitTypes::Zerg_Hatchery, uu->getTilePosition())))
-                                            lastErr = Broodwar->getLastError();
-                                        spreadHatcheryBuild = true;
-                                    }
-                                    if (spreadHatcheryBuild) break;
-                                }
-                            }
-                        }
-                        else if (!u->build(currTask.getRelatedUnit(),
-                            Broodwar->getBuildLocation(currTask.getRelatedUnit(),
-                                u->getTilePosition())))
-                        {
-                            lastErr = Broodwar->getLastError();
-                        }
-                        isBuildingDeployed = true;
-                        suspensionLastCheck = Broodwar->getFrameCount();
-                    }
-                }
+              // Train the supply provider (Overlord) if the provider is not a structure
+              supplyBuilder->train( supplyProviderType );
             }
-            if ( u->isIdle() )
-            {
-                if ( u->isCarryingGas() || u->isCarryingMinerals() )
-                {
-                    u->returnCargo();
-                }
-                if ( !u->getPowerUp() )
-                {
-                    if ( !u->gather( u->getClosestUnit( IsMineralField || IsRefinery )) )
-                    {
-                        Broodwar << Broodwar->getLastError() << std::endl;
-                    }
-                }
-            }
-        }
+          } // closure: supplyBuilder is valid
+        } // closure: insufficient supply
+      } // closure: failed to train idle unit
 
-        // if the unit is a Hatchery, Lair or Hive
-        if ( u->getType().producesLarva() )
-        {
-            if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT &&
-                Broodwar->getFrameCount() - suspensionLastCheck > SUSPENSION_INTERVAL)
-            {
-                for (const auto& l : u->getLarva())
-                {
-                    if ( !l->morph(currTask.getRelatedUnit()) )
-                    {
-                        lastErr = Broodwar->getLastError();
-                    }
-                    lackingLarva = false;
-                    break; // break the foor loop of larva
-                }
-            }
-        }
-
-        // if the unit is a extractor
-        if (u->getType() == UnitTypes::Zerg_Extractor)
-        {
-            Region r = u->getRegion();
-            if (r)
-            {
-                int workerThatGatheringGas = 0;
-                for (const auto& uu : r->getUnits())
-                {
-                    if (!uu) continue;
-                    if (uu->getType().isWorker() && uu->isGatheringGas())
-                        ++workerThatGatheringGas;
-                }
-                if (workerThatGatheringGas < 4)
-                {
-                    int moreWorkerForGas = 4 - workerThatGatheringGas;
-                    for (const auto& uu : r->getUnits())
-                    {
-                        if (!uu) continue;
-                        if (uu->getType().isWorker() && !uu->isGatheringGas())
-                        {
-                            uu->gather(u);
-                            --moreWorkerForGas;
-                            if (moreWorkerForGas <= 0 ) break;
-                        }
-                    }
-                }
-            }
-        }
-
-    } // end of unit loop
-    
-    // Error handling
-    if ( lastErr == Errors::Insufficient_Minerals )
-    {
-        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT ||
-            currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
-            taskQueue.push(currTask);
-        lastErr = Errors::None;
-        return;
-    }
-    if ( lastErr == Errors::Insufficient_Supply )
-    {
-        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT)
-            taskQueue.push(currTask);
-        if ( Broodwar->getFrameCount() - overlordLastChecked > OVERLORD_CHECK_INTERVAL &&
-            Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Overlord) == 0)
-        {
-            taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Overlord));
-            DevelopTools::logMessegeOnScreen("Pushed overlord because of the Insufficient_Supply error");
-            overlordLastChecked = Broodwar->getFrameCount();
-        }
-        lastErr = Errors::None;
-        return;
-    }
-    if (lastErr == Errors::Insufficient_Gas)
-    {
-        if ( currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT ||
-            currTask.getTaskCategory() == TaskCategories::BUILD_UNIT)
-            taskQueue.push(currTask);
-        if (Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Extractor) == 0 &&
-            taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Extractor) == -1)
-        {
-            taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Extractor));
-            DevelopTools::logMessegeOnScreen("Pushed a gas extractor because of Insufficient_Gas error");
-        }
-        lastErr = Errors::None;
-        return;
     }
 
-    // add new tasks 
-    if (Broodwar->getFrameCount() - lastSendScout > SCOUT_INTERVAL)
-    {
-        taskQueue.push(TaskItem(TaskCategories::SCOUT_MAP));
-        lastSendScout = Broodwar->getFrameCount();
-        DevelopTools::logMessegeOnScreen("Add a scouting task");
-    }
-
-    // add new build tasks
-    if (!isBuildingDeployed || Broodwar->getFrameCount() - suspensionLastCheck < SUSPENSION_INTERVAL) return;
-    if ((Broodwar->self()->allUnitCount() > Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) *
-        DRONE_BOUNDARY_FACTOR || (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hatchery) +
-        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Lair) +
-        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Hive)) * DRONE_EVERY_BASE >
-        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone)) &&
-        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Drone) == 0)
-    {
-        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Drone));
-        DevelopTools::logMessegeOnScreen("Pushed drone because drones are few");
-    }
-    if (lackingLarva && currTask.getTaskCategory() == TaskCategories::TRAIN_UNIT &&
-        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Hatchery) == 0 &&
-        Broodwar->getFrameCount() - hatcheryLastPushed > HATCHERY_CHECK_INTERVAL)
-    {
-        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Hatchery));
-        hatcheryLastPushed = Broodwar->getFrameCount();
-        DevelopTools::logMessegeOnScreen("Pushed a Hatchery since lacking larva.");
-    }
-    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Drone) >= FIRST_SPAWNING &&
-        Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
-        taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Spawning_Pool) == -1 &&
-        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0)
-    {
-        taskQueue.push(TaskItem(TaskCategories::BUILD_UNIT, UnitTypes::Zerg_Spawning_Pool));
-        DevelopTools::logMessegeOnScreen("Pushed spawning because it reaches the drone number ", FIRST_SPAWNING);
-    }
-    if (Broodwar->self()->allUnitCount(UnitTypes::Zerg_Spawning_Pool) > 0 &&
-        Broodwar->self()->incompleteUnitCount(UnitTypes::Zerg_Spawning_Pool) == 0 &&
-        Broodwar->getFrameCount() - zerglingLastChecked > ZERGLING_CHECK_INTERVAL &&
-        taskQueue.searchTaskRelatedUnit(UnitTypes::Zerg_Zergling) == -1)
-    {
-        taskQueue.push(TaskItem(TaskCategories::TRAIN_UNIT, UnitTypes::Zerg_Zergling));
-        zerglingLastChecked = Broodwar->getFrameCount();
-        DevelopTools::logMessegeOnScreen("push a pair of zergling");
-    }
-
-
-
-} // end of "onFrame"
+  } // closure: unit iterator
+}
 
 void ExampleAIModule::onSendText(std::string text)
 {
 
   // Send the text to the game if it is not being processed.
   Broodwar->sendText("%s", text.c_str());
+
 
   // Make sure to use %s and pass the text as a parameter,
   // otherwise you may run into problems when you use the %(percent) character!
