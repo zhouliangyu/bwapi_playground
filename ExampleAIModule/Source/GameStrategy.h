@@ -7,10 +7,11 @@ using namespace Filter;
 
 class GameStrategy
 {
-    private:
-    public:
-        int getTotalDroneCount();
-        int getTotalBaseCount();
-        bool needTrainDrone();
-        bool trainUnit(const UnitType& unit);
+	private:
+	public:
+		int getTotalDroneCount();
+		int getTotalBaseCount();
+		bool needTrainDrone();
+		Error trainUnit(const UnitType& unit);
+		bool processError(Error lastErr);
 };
